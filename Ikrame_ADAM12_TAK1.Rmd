@@ -3,20 +3,22 @@ title: "Ikrame_ADAM12_TAK1"
 output: html_notebook
 ---
 #Les librairies : 
-___________________
+
 ```{r}
 library(ggplot2)
-library(DESeq2)
 library(plotly)
 library(ggrepel)
+
 library(RColorBrewer)
-library(heatmap3)
+library(ComplexHeatmap)
+
 library(cluster)
 library(factoextra)
 library(magrittr)
 library(dendextend)
-library("devtools")
-source_url("https://raw.githubusercontent.com/obigriffith/biostar-tutorials/master/Heatmaps/heatmap.3.R")
+
+library(survival)
+library(survminer)
 ```
 #Les données : 
 
@@ -35,8 +37,8 @@ Trad=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/171
 
 load("C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180313_TCGA_Ikrame/Ikrame_ADAM12_TAK1.RData")
 ```
-Les sous-groupes d'expression de ADAM12 : 
-________________________________________
+##Définition:  sous-groupes d'expression de ADAM12 : 
+
 ```{r}
 rownames(dds_tableTOT_CRC)=make.names(Trad$Symbol, unique=TRUE)
 rownames(dds_tableTOT_lung)=make.names(Trad$Symbol, unique=TRUE)
@@ -92,9 +94,9 @@ NT_breast=names(ADAM_NT_breast)
 
 c(length(high_ADAM_CRC),length(low_ADAM_CRC),length(high_ADAM_lung),length(low_ADAM_lung),length(high_ADAM_breast),length(low_ADAM_breast) )
 ```
+## Boxplot ADAM12 NT / Tum
 On voudrait comparer l'expression d'ADAM12 entre NT et tumor dans le sein, pour justifier le modele d'Ikrame
-ADAM12 NT / Tum
-------------
+
 ```{r}
 #on recode les variables
 Type=rep(NA, length(clab_breast2$Type))
@@ -138,8 +140,9 @@ ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_bre
 
 ```
 
-Test stats
-----------
+## Test stats : AOV puis Tuckey
+On compare toutes les conditions entre elles, le Tuckey est approprié suite à l'anova
+
 ```{r}
 data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]/median(ADAM_NT_breast)),
                        Type,Stage,ClassTum )
@@ -157,7 +160,7 @@ library(PMCMRplus)
 
 summary(tukeyTest(values ~ Type,data))
 ```
-
+## Niveau d'expression Adam12 dans les différents sous-types
 ```{r}
 total_type=rep(NA, length(c(clab_breast$Type,clab_CRC$Type,clab_lung$Type)))
 total_type[which(is.element(clab_breast$Type, c("Solid Tissue Normal")))]="Breast _ NT"
@@ -208,7 +211,7 @@ P=ggplot(data=data.frame(values=c(t(dds_tableTOT_breast[which(rownames(dds_table
   scale_fill_manual(values=c("white","black","white", "black", "white", "black"))
 P
 ```
-
+## Niveau d'expression Adam12 selon le stage 
 ```{r}
 Stage=c(coldata_rse_breast$cgc_case_pathologic_stage)
 levels(as.factor(Stage))
@@ -242,6 +245,7 @@ P2=ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_
   scale_fill_manual(values=c("white","grey70","grey50", "grey30", "grey10", "white"))
 P2
 ```
+## Niveau d'expression Adam12 selon le sous-type de cancer du sein
 ```{r}
 summary(coldata_rse_breast$xml_breast_carcinoma_estrogen_receptor_status)
 summary(coldata_rse_breast$xml_breast_carcinoma_progesterone_receptor_status)
@@ -319,7 +323,7 @@ ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_bre
   scale_fill_manual(values=c( "grey30","grey50","white", "red4"))
 ```
 
-#JPapier
+# Figure Papier
 ```{r}
 plotX=ggplot()+ theme_classic() #plot espaceur
 
@@ -329,7 +333,7 @@ grid.arrange(P1, plotX, P2, P3,
              )
 ```
 
-#Courbe de survie selon expression ADAM12
+# Courbe de survie selon expression ADAM12
 ```{r}
 coldata_rse_breast=colData(rse_gene)
 dim(coldata_rse_breast)
@@ -364,12 +368,6 @@ status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne 
 
 
 head(cbind(Suivi_progression, status_recidive, Suivi_Mort, status_mort),10)
-```
-
-```{r}
-library(survival)
-library(survminer)
-
 ```
 ```{r}
 B=ClassTum
@@ -430,7 +428,7 @@ arrange_ggsurvplots(splots, print = TRUE, title="Breast Adam12 Survie",
 ```
 
 
-#Modèles de Cox
+# Survie : Modèles de Cox
 ```{r}
 A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
 
@@ -495,7 +493,7 @@ print(plot)
 ```
 
 
-
+## COnstruction des sous-ensemble tumeurs / NT
 
 ```{r}
 #On récupere les labels des échantillons sélectionnés, on ajoute une colonne contenant le groupe ADAM, et une colonne contenant le type de tissu
@@ -548,15 +546,15 @@ ComparADAM_ddsTOT_total=cbind(ComparADAM_ddsTOT_CRC,ComparADAM_ddsTOT_lung,Compa
 ```
 
 
-#Activation TAK1 à partir des gènes cibles d'oli*
+# Activation TAK1 à partir des gènes cibles d'oli*
 
 
 On veut normaliser les gènes cibles de TAK1 par rapport à leur niveau d'expression basal dans les tissus normaux correspondants
 
 Le vecteur contenant le nom des gènes TAK1 est SignatureTAK1
 
-Construction subset et calcul signatire TAK1
------------------
+## Construction subset et calcul score TAK1 activé
+
 ```{r}
 rm(SignatureTAK1)
 SignatureTAK1=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180310_Signature_TAK1/SIgnatureTAK1pos.txt", header=F, sep="\t")
@@ -601,9 +599,9 @@ subADAM_TAK1_norm_tot=cbind(subADAM_TAK1_c,subADAM_TAK1_l,subADAM_TAK1_b)
 
 ```
 Si on divise les heatmaps
+# Heatmap
+## Heatmap Breast
 
-Heatmap Breast
---------------
 ```{r}
 library(ComplexHeatmap)
 library(circlize)
@@ -661,8 +659,8 @@ Heatmap(as.matrix(log2(breastsubADAM_TAK1_norm_tot)),
 
 
 ```
-Corrélation
----------
+## Corrélation Breast
+
 ```{r}
 ADAM_TAK1_b=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),]
 ADAM_TAK1_l=dds_tableTOT_lung[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),]
@@ -772,7 +770,7 @@ ggplot(data=data, aes(x=log2(Adam), y=Tak, color=Type))+
 
 
 
-##Corrélation KAT2A /TAK1
+## Corrélation KAT2A /TAK1
 ```{r}
 A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]
 
@@ -824,7 +822,7 @@ ggplot(data=data, aes(x=log2(KAT2A), y=Tak, color=Type))+
 
 
 
-##???SIRT6
+## SIRT6
 
 
 ```{r}
@@ -869,7 +867,7 @@ ggplot(data=data, aes(x=log2(SIRT6), y=Tak, color=Type))+
       annotate("text", x = 17.05, y = 400.05, label = equation(M), parse = TRUE)
 ```
 
-##.Pie chart
+## Pie chart
 ```{r}
 library("gridExtra")
 
@@ -910,8 +908,8 @@ grid.arrange(ggTS_NT,
 ```
 
 
-heatmap Colon
-----------
+## heatmap Colon
+# A réécrire pour la nouvelle signature + utiliser ComplexHeatmap
 ```{r}
 CRCsubADAM_TAK1_norm_tot=subADAM_TAK1_norm_tot[,which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC")]
 Label_col=data.frame(Decile=(rep(NA,dim(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC"),])[1] )))
@@ -1018,8 +1016,8 @@ fill=c("white","black","grey"), border=TRUE, bty="n", y.intersp = 0.7, cex=0.7)
 
 
 
-#**Expression relative de KAT2A et SIRT6 : **
-____________________________________________
+#Expression relative de KAT2A et SIRT6 : 
+
 ```{r}
 geneint=c("ADAM12","COL6A1","COL6A2","COL6A3","MAP3K7","SIRT6","KAT2A","CDKN2B","CDKN1A","CDKN1B","IL6","SMAD7","CDC25A","MYC","ID1","ID2","ID3", "CLDN3","CLDN4","CLDN7","CDH1","CDH2","TJP1","DSP","VIM","ESR1","PGR","ERBB2","TGFB1","COL1A1","MMP2","ZBTB4","ADAM19")
 subADAM_table_CRC=ComparADAM_ddsTOT_CRC[which(is.element(rownames(ComparADAM_ddsTOT_CRC), geneint)==TRUE),]
@@ -1171,7 +1169,7 @@ ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("SIRT6"))==TRUE),],
 ```
 
 ##############################
-#TESTS STATS
+# TESTS STATS
 _______________________
 
 #en changeant SIRT6 MAP3K7 KAT2A ADAM12
@@ -1188,8 +1186,8 @@ summary(tukeyTest(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "ADAM12"
               Type %in% "BREAST")))
 ```
 #Breast TN
-A²12 NT / Tum
-----------------
+A12 NT / Tum
+
 ```{r}
 B=which(ClassTum=="Triple-negative")
 
@@ -1278,8 +1276,8 @@ splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
 arrange_ggsurvplots(splots, print = TRUE, title="Breast Adam12 Survie",
   ncol = 2, nrow = 1, risk.table.height = 0.3)
 ```
-survioe TAK1
--------------
+## survie TAK1
+
 ```{r}
 
 A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="MAP3K7"),]
@@ -1336,8 +1334,8 @@ splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
 arrange_ggsurvplots(splots, print = TRUE, title="Breast Adam12 Survie",
   ncol = 2, nrow = 1, risk.table.height = 0.3)
 ```
-Survie KAT2A
------------
+## Survie KAT2A
+
 ```{r}
 
 A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]
@@ -1467,8 +1465,8 @@ Heatmap(as.matrix(log2(subADAM_TAK1_b_TN)),
 
 ```
 
-Boxplot
---------------------
+## Boxplot
+
 ```{r}
 
 
