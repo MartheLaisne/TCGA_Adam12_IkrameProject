@@ -1,0 +1,317 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+
+
+#Subset de 190 gènes aléatoire
+
+Longue bouvle for, faire tourner ON
+
+
+```{r}
+library(dplyr)
+library("Hmisc")
+
+#Initiatlisation
+Adam=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
+Population_r_random=c()
+
+
+Kat2a=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]
+Population_r_random_kat=c()
+
+
+############################################
+##Boucle
+for (i in c(0:1000)) {
+  
+
+
+#Génération signature aléatoire, même taille que vraie signature
+Signature_random = rownames(sample_n(dds_tableTOT_breast, 
+                            size = length(SignatureTAK1$V1), replace = FALSE))
+
+#Subset de la signature
+ADAM_TAK1_random_b=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), Signature_random)==TRUE),]
+
+#Calcul des FC
+Median_NT_random_breast=c()
+for (i in seq(1,dim(ADAM_TAK1_random_b)[1])) {
+  Median_NT_random_breast=c(Median_NT_random_breast, median(as.matrix(ADAM_TAK1_random_b)[i,1:112]))
+}
+
+#on divise toutes les valeurs par cette mediane : on obtient un score relatif d'enrichissement
+for(i in seq(1, dim(ADAM_TAK1_random_b)[1])) {
+ADAM_TAK1_random_b[i,]=ADAM_TAK1_random_b[i,]/Median_NT_random_breast[i]
+}
+
+# Pour passer au log, pas de valeurs infinie ou nulle
+for (i in c(1:dim(ADAM_TAK1_random_b)[2])) {
+  ADAM_TAK1_random_b[which(ADAM_TAK1_random_b[,i]==Inf),i]=NA
+    ADAM_TAK1_random_b[which(log2(ADAM_TAK1_random_b[,i])==-Inf),i]=NA
+   ADAM_TAK1_random_b[which(is.nan(ADAM_TAK1_random_b[,i])==T),i]=NA
+}
+
+Tak1_all=apply((log2(ADAM_TAK1_random_b)),
+               2,
+               MafonctionSum)
+
+#Score TAK1 et ADAM12
+
+data=data.frame(Tak=Tak1_all,
+           Adam=t(Adam),
+           Type=Type)
+
+#{Calcul corrélation}
+xm = as.matrix(data[,1:2])
+M <-  rcorr(xm, type = "pearson")
+print(M$r)
+
+#on stock et on itère
+Population_r_random=c(Population_r_random, M$r[1,2])
+
+
+
+#Score TAK1 et Kat2A
+data=data.frame(Tak=Tak1_all,
+           kat=t(Kat2a),
+           Type=Type)
+#{Calcul corrélation}
+xm = as.matrix(data[,1:2])
+M <-  rcorr(xm, type = "pearson")
+print(M$r)
+#on stock et on itère
+Population_r_random_kat=c(Population_r_random_kat, M$r[1,2])
+
+
+} #???Fin for
+
+length(Population_r_random)
+head(Population_r_random)
+
+length(Population_r_random_kat)
+head(Population_r_random_kat)
+```
+
+
+
+#Random ADAM12
+##Ex: corrélation random
+```{r}
+
+#Génération signature aléatoire, même taille que vraie signature
+Signature_random = rownames(sample_n(dds_tableTOT_breast, 
+                            size = length(SignatureTAK1$V1), replace = FALSE))
+
+#Subset de la signature
+ADAM_TAK1_random_b=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), Signature_random)==TRUE),]
+
+#Calcul des FC
+Median_NT_random_breast=c()
+for (i in seq(1,dim(ADAM_TAK1_random_b)[1])) {
+  Median_NT_random_breast=c(Median_NT_random_breast, median(as.matrix(ADAM_TAK1_random_b)[i,1:112]))
+}
+
+#on divise toutes les valeurs par cette mediane : on obtient un score relatif d'enrichissement
+for(i in seq(1, dim(ADAM_TAK1_random_b)[1])) {
+ADAM_TAK1_random_b[i,]=ADAM_TAK1_random_b[i,]/Median_NT_random_breast[i]
+}
+
+# Pour passer au log, pas de valeurs infinie ou nulle
+for (i in c(1:dim(ADAM_TAK1_random_b)[2])) {
+  ADAM_TAK1_random_b[which(ADAM_TAK1_random_b[,i]==Inf),i]=NA
+    ADAM_TAK1_random_b[which(log2(ADAM_TAK1_random_b[,i])==-Inf),i]=NA
+   ADAM_TAK1_random_b[which(is.nan(ADAM_TAK1_random_b[,i])==T),i]=NA
+}
+
+Tak1_all=apply((log2(ADAM_TAK1_random_b)),
+               2,
+               MafonctionSum)
+
+#Score random et ADAM12
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
+
+Type=rep("Int", dim(dds_tableTOT_breast)[2])
+Type[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+Type[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+Type=Type[-which(clab_breast=="Solid Tissue Normal")]
+Type=as.factor(Type)
+
+data=data.frame(Tak=Tak1_all,
+           Adam=t(Adam),
+           Type=Type)
+
+#{Calcul corrélation}
+xm = as.matrix(data[,1:2])
+M <-  rcorr(xm, type = "pearson")
+print(M$r)
+
+ggplot(data=data, aes(x=log2(ADAM12), y=Tak, color=Type))+
+  geom_point()+
+ geom_smooth(colour = "black",fill="white", method = "lm") +
+  scale_color_manual(values=c("red4", "black","green4"))+
+  labs(title="Correlation ADAM12 & Random signatures \n All Tumors (Breast)", y="TAK1 activation Score",x="log2(ADAM12 expression)",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+      annotate("text", x = 15.05, y = 180.05, label = equation(M), parse = TRUE)
+
+
+```
+
+
+
+##Distribution
+```{r}
+#Graphes
+
+ggplot(data=as.data.frame(Population_r_random), 
+       aes(x=Population_r_random))+
+  geom_histogram(binwidth = 0.01, alpha=1, position="identity", color="black", fill="white")+
+  scale_x_continuous(limits=c(-1,1))+
+  scale_y_continuous(limits=c(0,80))+
+  geom_vline(xintercept=TAK1_ADAM12, size=1, color="red")+
+  geom_vline(xintercept=0, size=1, linetype="dotted", color="black")+
+  labs(title="Correlation ADAM12 & Random signatures \n All Tumors (Breast)", y="Counts",x="r",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))
+
+
+
+```
+##Calcul p empirique et z-score
+
+```{r}
+
+p_adam=sum(Population_r_random>TAK1_ADAM12)/length(Population_r_random)
+p_adam
+#"calcul z-score
+
+Z_adam=(TAK1_ADAM12-mean(Population_r_random))/sd(Population_r_random)
+Z_adam
+
+```
+
+##Approx Gumbel
+
+
+```{r}
+n=length(Population_r_random)
+
+data=data.frame(scores=sort(Population_r_random),
+                cdf=(1:n)/(n+1))
+
+fitG=lm(log(-log(data$cdf)) ~ data$scores)
+summary(fitG)
+
+zG=predict(fitG, newdata= data.frame(scores = data$scores))
+pvaluesGumbel = -expm1( - exp (zG))
+
+1-pvaluesGumbel[1]
+```
+
+#Random KAT2A
+
+## Distribution
+
+```{r}
+ggplot(data=as.data.frame(Population_r_random_kat), 
+       aes(x=Population_r_random_kat))+
+  geom_histogram(binwidth = 0.01, alpha=1, position="identity", color="black", fill="white")+
+  scale_x_continuous(limits=c(-1,1))+
+  scale_y_continuous(limits=c(0,80))+
+  geom_vline(xintercept=TAK1_KAT2A, size=1, color="green4")+
+  geom_vline(xintercept=0, size=1, linetype="dotted", color="black")+
+  labs(title="Correlation KAT2A & Random signatures \n All Tumors (Breast)", y="Counts",x="r",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+      annotate("text", x = 15.05, y = 400.05, label = equation(M), parse = TRUE)
+```
+
+##Calcul p empirique : ça n'a pas grand sens ici
+
+```{r}
+
+p_kat=sum(Population_r_random_kat<TAK1_KAT2A)/length(Population_r_random_kat)
+p_kat
+#"calcul z-score
+
+Z_kat=(TAK1_KAT2A-mean(Population_r_random_kat))/sd(Population_r_random_kat)
+Z_kat
+```
+
+##Approx Gumbel
+
+```{r}
+n=length(Population_r_random_kat)
+
+dataG=data.frame(scores=sort(Population_r_random_kat),
+                cdf=(1:n)/(n+1))
+head(dataG)
+
+fitG=lm(log(-log(data$cdf)) ~ dataG$scores)
+summary(fitG)
+
+zG=predict(fitG, newdata= data.frame(scores = dataG$scores))
+head(dataG$scores)
+head(zG)
+pvaluesGumbel = -expm1( - exp (zG))
+
+1-pvaluesGumbel[1]
+```
+
+##Ex: Correlation random
+```{r}
+Tak1_all=apply((log2(ADAM_TAK1_random_b)),
+               2,
+               MafonctionSum)
+
+#Score random et ADAM12
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]
+
+Type=rep("Int", dim(dds_tableTOT_breast)[2])
+Type[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+Type[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+Type=Type[-which(clab_breast=="Solid Tissue Normal")]
+Type=as.factor(Type)
+
+
+#Score TAK1 et Kat2A
+data=data.frame(Tak=Tak1_all,
+           kat=t(Kat2a),
+           Type=Type)
+#{Calcul corrélation}
+xm = as.matrix(data[,1:2])
+M <-  rcorr(xm, type = "pearson")
+print(M$r)
+
+ggplot(data=data, aes(x=log2(KAT2A), y=Tak, color=Type))+
+  geom_point()+
+  geom_smooth(colour = "black",fill="white", method = "lm") +
+  scale_color_manual(values=c("red4", "black","green4"))+
+  labs(title="Correlation KAT2A & Random signature \n All Tumors (Breast)", y="TAK1 activation Score",x="log2(KAT2A expression)",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+      annotate("text", x = 17.05, y = 200.05, label = equation(M), parse = TRUE)
+
+```
+

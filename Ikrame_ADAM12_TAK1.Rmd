@@ -1,0 +1,2333 @@
+---
+title: "Ikrame_ADAM12_TAK1"
+output: html_notebook
+---
+#**Les librairies : **
+___________________
+```{r}
+library(ggplot2)
+library(DESeq2)
+library(plotly)
+library(ggrepel)
+library(RColorBrewer)
+library(heatmap3)
+library(cluster)
+library(factoextra)
+library(magrittr)
+library(dendextend)
+library("devtools")
+source_url("https://raw.githubusercontent.com/obigriffith/biostar-tutorials/master/Heatmaps/heatmap.3.R")
+```
+#**Les données : **
+______________
+
+```{r}
+dds_tableTOT_CRC=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/171220_TCGA_COAD/dds_tableTOT_CRC.txt", header=TRUE, sep="\t")
+clab_CRC=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/171220_TCGA_COAD/clab_CRC.txt", header=TRUE, sep="\t")
+
+dds_tableTOT_lung=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180216_TCGA_LUNG/dds_tableTOT_Lung.txt", header=TRUE, sep="\t")
+clab_lung=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180216_TCGA_LUNG/labels_lung.txt", header=TRUE, sep="\t")
+
+dds_tableTOT_breast=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180301_TCGA_BREAST/dds_tableTOT_Breast.txt", header=TRUE, sep="\t")
+clab_breast=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180301_TCGA_BREAST/labels_Breast.txt", header=TRUE, sep="\t")
+
+Trad=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/171220_TCGA_COAD/Trad.txt", header=TRUE, sep="\t")
+
+load("C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180313_TCGA_Ikrame/Ikrame_ADAM12_TAK1.RData")
+```
+Les sous-groupes d'expression de ADAM12 : 
+________________________________________
+```{r}
+rownames(dds_tableTOT_CRC)=make.names(Trad$Symbol, unique=TRUE)
+rownames(dds_tableTOT_lung)=make.names(Trad$Symbol, unique=TRUE)
+rownames(dds_tableTOT_breast)=make.names(Trad$Symbol, unique=TRUE)
+
+#Les premières et dernières lignes contiennent les annotations ENSG et HUGO, on les enlève (pas besoin ici, UGO en rownames)
+dds_tableTOT_CRC=dds_tableTOT_CRC[,-c(1,dim(dds_tableTOT_CRC)[2])]
+dds_tableTOT_lung=dds_tableTOT_lung[,-c(1)]
+dds_tableTOT_breast=dds_tableTOT_breast[,-c(1,dim(dds_tableTOT_breast)[2])]
+
+#on isole les tissus normaux et les tumeurs, on veut les premiers et dernier décile d'expression de ADAM12 dans les tumeurs spécifiquement
+dds_tissunorm_CRC=dds_tableTOT_CRC[,c(which(as.data.frame(clab_CRC)$Type=="hotpink"))]
+dds_tumor_CRC=dds_tableTOT_CRC[,c(which(as.data.frame(clab_CRC)$Type=="black"))]
+
+dds_tissunorm_lung=dds_tableTOT_lung[,c(which(clab_lung$Type=="Solid Tissue Normal"))]
+dds_tumor_lung=dds_tableTOT_lung[,c(which(clab_lung$Type=="Primary Tumor"))]
+
+dds_tissunorm_breast=dds_tableTOT_breast[,c(which(clab_breast$Type=="Solid Tissue Normal"))]
+dds_tumor_breast=dds_tableTOT_breast[,c(which(clab_breast$Type=="Primary Tumor"))]
+
+
+
+
+#on fait un vecteur ADAM avec seulement les valeurs d'expression d'ADAM12; et en titre les échantillons correspondants
+ADAM_NT_CRC=c(as.numeric(dds_tissunorm_CRC[which(rownames(dds_tissunorm_CRC)=="ADAM12"),]))
+names(ADAM_NT_CRC)=colnames(dds_tissunorm_CRC[,])
+ADAM_tumor_CRC=c(as.numeric(dds_tumor_CRC[which(rownames(dds_tumor_CRC)=="ADAM12"),]))
+names(ADAM_tumor_CRC)=colnames(dds_tumor_CRC[,])
+
+ADAM_NT_lung=c(as.numeric(dds_tissunorm_lung[which(rownames(dds_tissunorm_lung)=="ADAM12"),]))
+names(ADAM_NT_lung)=colnames(dds_tissunorm_lung[,])
+ADAM_tumor_lung=c(as.numeric(dds_tumor_lung[which(rownames(dds_tumor_lung)=="ADAM12"),]))
+names(ADAM_tumor_lung)=colnames(dds_tumor_lung[,])
+
+ADAM_NT_breast=c(as.numeric(dds_tissunorm_breast[which(rownames(dds_tissunorm_breast)=="ADAM12"),]))
+names(ADAM_NT_breast)=colnames(dds_tissunorm_breast[,])
+ADAM_tumor_breast=c(as.numeric(dds_tumor_breast[which(rownames(dds_tumor_breast)=="ADAM12"),]))
+names(ADAM_tumor_breast)=colnames(dds_tumor_breast[,])
+
+#On prend les noms des échantillons du premier et du dernier décile
+high_ADAM_CRC=names(which(ADAM_tumor_CRC>quantile(ADAM_tumor_CRC,0.9)))
+low_ADAM_CRC=names(which(ADAM_tumor_CRC<=quantile(ADAM_tumor_CRC,0.1)))
+NT_CRC=names(ADAM_NT_CRC)
+
+high_ADAM_lung=names(which(ADAM_tumor_lung>quantile(ADAM_tumor_lung,0.9)))
+low_ADAM_lung=names(which(ADAM_tumor_lung<=quantile(ADAM_tumor_lung,0.1)))
+NT_lung=names(ADAM_NT_lung)
+
+high_ADAM_breast=names(which(ADAM_tumor_breast>quantile(ADAM_tumor_breast,0.9)))
+low_ADAM_breast=names(which(ADAM_tumor_breast<=quantile(ADAM_tumor_breast,0.1)))
+NT_breast=names(ADAM_NT_breast)
+
+
+c(length(high_ADAM_CRC),length(low_ADAM_CRC),length(high_ADAM_lung),length(low_ADAM_lung),length(high_ADAM_breast),length(low_ADAM_breast) )
+```
+On voudrait comparer l'expression d'ADAM12 entre NT et tumor dans le sein, pour justifier le modele d'Ikrame
+ADAM12 NT / Tum
+------------
+```{r}
+#on recode les variables
+Type=rep(NA, length(clab_breast2$Type))
+Type[which(is.element(clab_breast2$Type, c("Solid Tissue Normal"))==TRUE)]="Solid Tissue Normal"
+Type[which(is.element(clab_breast2$Type, c("Primary Tumor", "Metastatic"))==TRUE)]="Tumor"
+
+
+Stage=rep(NA, length(clab_breast2$Stage))
+Stage[which(is.element(clab_breast2$Stage, c("stage i", "stage ia", "stage ib"))==TRUE)]="Stage I"
+Stage[which(is.element(clab_breast2$Stage, c("stage ii", "stage iia", "stage iib"))==TRUE)]="Stage II"
+Stage[which(is.element(clab_breast2$Stage, c("stage iii", "stage iiia", "stage iiib", "stage iiic"))==TRUE)]="Stage III"
+Stage[which(is.element(clab_breast2$Stage, c("stage iv"))==TRUE)]="Stage IV"
+Stage[which(is.element(clab_breast2$Type, c("Solid Tissue Normal"))==TRUE)]="Solid Tissue Normal"
+
+ClassTum=rep(NA, length(clab_breast$Stage))
+ClassTum[which(clab_breast$ER=="Negative"&clab_breast$PR=="Negative"&clab_breast$HER2=="Negative")]="Triple negative"
+ClassTum[which(clab_breast$ER=="Positive")]="HR"
+ClassTum[which(clab_breast$PR=="Positive")]="HR"
+ClassTum[which(clab_breast$HER2=="Positive")]="HER2"
+ClassTum[which(clab_breast$HER2=="Equivocal")]="HER2equiv"
+
+ClassTum[which(is.element(clab_breast$Type, c("Solid Tissue Normal"))==TRUE)]="Solid Tissue Normal"
+
+
+ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]/median(ADAM_NT_breast)),
+                       Type,Stage,ClassTum ),
+       aes(x=Type, y=log2(values), fill=Type))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=2, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey")+
+  labs(title="ADAM12 Breast", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+  scale_x_discrete(limits=c("","Solid Tissue Normal","Tumor",""))+
+  scale_fill_manual(values=c("white","black"))
+
+```
+
+Test stats
+----------
+```{r}
+data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]/median(ADAM_NT_breast)),
+                       Type,Stage,ClassTum )
+head(data)
+```
+
+
+```{r}
+summary(aov(values ~ Type,data))
+```
+```{r}
+#install.packages('PMCMRplus')
+library(PMCMRplus)
+#?tukeyTest
+
+summary(tukeyTest(values ~ Type,data))
+```
+
+```{r}
+total_type=rep(NA, length(c(clab_breast$Type,clab_CRC$Type,clab_lung$Type)))
+total_type[which(is.element(clab_breast$Type, c("Solid Tissue Normal")))]="Breast _ NT"
+total_type[c(which(is.element(clab_breast$Type, c("Metastatic", "Primary Tumor"))))]="Breast _ Tumor"
+total_type[c(length(clab_breast$Type)+which(is.element(clab_CRC$Type, c("hotpink"))))]="CRC _ NT"
+total_type[c(length(clab_breast$Type)+which(is.element(clab_CRC$Type, c("grey50", "black"))))]="CRC _ Tumor"
+total_type[c(length(clab_breast$Type)+length(clab_CRC$Type)+which(is.element(clab_lung$Type, c("Solid Tissue Normal"))))]="Lung _ NT"
+total_type[c(length(clab_breast$Type)+length(clab_CRC$Type)+which(is.element(clab_lung$Type, c("Recurrent Tumor", "Primary Tumor"))))]="Lung _ Tumor"
+
+P1=ggplot(data=data.frame(values=c(t(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]/median(ADAM_NT_breast)),
+                        t(dds_tableTOT_CRC[which(rownames(dds_tableTOT_CRC)=="ADAM12"),]/median(ADAM_NT_CRC)),
+                         t(dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),]/median(ADAM_NT_lung))),
+                type=total_type),
+       aes(x=type, y=log2(values), fill=type))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=2, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey")+
+  labs(title="ADAM12 All", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+#  scale_x_discrete(limits=c("","Solid Tissue Normal","Tumor",""))+
+  scale_fill_manual(values=c("white","black","white", "black", "white", "black"))
+P1
+```
+```{r}
+P=ggplot(data=data.frame(values=c(t(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]),
+                        t(dds_tableTOT_CRC[which(rownames(dds_tableTOT_CRC)=="ADAM12"),]),
+                         t(dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),])),
+                type=total_type),
+       aes(x=type, y=log2(values), fill=type))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=2, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey")+
+  labs(title="ADAM12 All", y="Expression relative",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+#  scale_x_discrete(limits=c("","Solid Tissue Normal","Tumor",""))+
+  scale_fill_manual(values=c("white","black","white", "black", "white", "black"))
+P
+```
+
+```{r}
+Stage=c(coldata_rse_breast$cgc_case_pathologic_stage)
+levels(as.factor(Stage))
+length(Stage)
+Stage[which(is.element(Stage, c("Stage I","Stage IA","Stage IB"))==TRUE)]="Stage I"
+Stage[which(is.element(Stage, c("Stage II","Stage IIA","Stage IIB"))==TRUE)]="Stage II"
+Stage[which(is.element(Stage, c( "Stage III"  ,"Stage IIIA", "Stage IIIB", "Stage IIIC"))==T)]="Stage III"
+Stage[which(is.element(Stage, c( "Stage IV"))==T)]="Stage IV"
+
+Stage[which(is.element(Stage, c( "Stage Tis" , "Stage X"))==T)]=NA
+Stage[which(coldata_rse_breast$gdc_cases.samples.sample_type=="Solid Tissue Normal")]="Normal"
+Stage=as.factor(as.character(Stage))
+summary(Stage)
+
+
+P2=ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]/median(ADAM_NT_breast)),
+                       Type,Stage,ClassTum ),
+       aes(x=Stage, y=log2(values), fill=Stage))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="ADAM12 Breast by stage", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+  scale_x_discrete(limits=c("","Normal","Stage I","Stage II", "Stage III", "Stage IV", ""))+
+  scale_fill_manual(values=c("white","grey70","grey50", "grey30", "grey10", "white"))
+P2
+```
+```{r}
+summary(coldata_rse_breast$xml_breast_carcinoma_estrogen_receptor_status)
+summary(coldata_rse_breast$xml_breast_carcinoma_progesterone_receptor_status)
+#summary(coldata_rse_breast$xml_her2_immunohistochemistry_level_result)
+summary(coldata_rse_breast$xml_lab_proc_her2_neu_immunohistochemistry_receptor_status)
+
+ClassTum=rep(NA, dim(dds_tableTOT_breast)[2])
+ClassTum[which(coldata_rse_breast$xml_breast_carcinoma_estrogen_receptor_status=="Positive")]="hormono-dependant"
+ClassTum[which(coldata_rse_breast$xml_breast_carcinoma_progesterone_receptor_status=="Positive")]="hormono-dependant"
+ClassTum[which(coldata_rse_breast$xml_lab_proc_her2_neu_immunohistochemistry_receptor_status=="Positive")]="HER2-amplified"
+ClassTum[which(coldata_rse_breast$xml_lab_proc_her2_neu_immunohistochemistry_receptor_status=="Negative"&coldata_rse_breast$xml_breast_carcinoma_progesterone_receptor_status=="Negative"&coldata_rse_breast$xml_breast_carcinoma_estrogen_receptor_status=="Negative")]="Triple-negative"
+
+ClassTum[which(coldata_rse_breast$gdc_cases.samples.sample_type=="Solid Tissue Normal")]="Solid Tissue Normal"
+
+ClassTum=as.factor(ClassTum)
+summary((ClassTum))
+
+P3=ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]/median(ADAM_NT_breast)),
+                       Type,Stage,ClassTum ),
+       aes(x=ClassTum, y=log2(values), fill=ClassTum))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="ADAM12 Breast by molecular subtypes", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+  scale_x_discrete(limits=c("","Solid Tissue Normal","","hormono-dependant","HER2-amplified", "Triple-negative", ""))+
+  scale_fill_manual(values=c( "grey30","grey50","white", "grey10"))
+P3
+```
+```{r}
+
+MAP3K7_NT_breast=c(as.numeric(dds_tissunorm_breast[which(rownames(dds_tissunorm_breast)=="MAP3K7"),]))
+
+ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="MAP3K7"),]/median(MAP3K7_NT_breast)),
+                       Type,Stage,ClassTum ),
+       aes(x=ClassTum, y=log2(values), fill=ClassTum))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="ADAM12 Breast by molecular subtypes", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+  scale_x_discrete(limits=c("","Solid Tissue Normal","","hormono-dependant","HER2-amplified", "Triple-negative", ""))+
+  scale_fill_manual(values=c( "grey30","grey50","white", "red4"))
+```
+```{r}
+KAT2A_NT_breast=c(as.numeric(dds_tissunorm_breast[which(rownames(dds_tissunorm_breast)=="KAT2A"),]))
+
+ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]/median(KAT2A_NT_breast)),
+                       Type,Stage,ClassTum ),
+       aes(x=ClassTum, y=log2(values), fill=ClassTum))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="KAT2A Breast by molecular subtypes", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+  scale_x_discrete(limits=c("","Solid Tissue Normal","","hormono-dependant","HER2-amplified", "Triple-negative", ""))+
+  scale_fill_manual(values=c( "grey30","grey50","white", "red4"))
+```
+
+#JPapier
+```{r}
+plotX=ggplot()+ theme_classic() #plot espaceur
+
+grid.arrange(P1, plotX, P2, P3,
+             ncol=2, nrow=2,
+             widths=c(2,2), heights=c(4,4)
+             )
+```
+
+#Courbe de survie selon expression ADAM12
+```{r}
+coldata_rse_breast=colData(rse_gene)
+dim(coldata_rse_breast)
+dim(dds_tableTOT_breast)
+
+Type_sample=coldata_rse_breast$gdc_cases.samples.sample_type
+
+years_to_death=(coldata_rse_breast$gdc_cases.diagnoses.days_to_death)/(365)
+years_to_last_follow_up=coldata_rse_breast$gdc_cases.diagnoses.days_to_last_follow_up/(365)
+New_tumor_event=(coldata_rse_breast$cgc_case_new_tumor_event_after_initial_treatment)
+
+head(data.frame(years_to_death, years_to_last_follow_up, New_tumor_event))
+
+
+#survie gloable : le premier évenement est la mort
+Suivi_Mort=years_to_last_follow_up
+Suivi_Mort[which(is.na(years_to_death)==FALSE)]=years_to_death[which(is.na(years_to_death)==FALSE)]
+
+status_mort=rep(NA, length(years_to_death))
+status_mort[which(is.na(years_to_death)==TRUE)]=0
+status_mort[which(is.na(years_to_death)==FALSE)]=1
+
+#survie sans progression : le premier évenement est la mort ou la rechute
+Suivi_progression=years_to_last_follow_up
+#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (généralement c'est exclusif)
+Suivi_progression[which(is.na(years_to_last_follow_up)==TRUE)]=years_to_death[which(is.na(years_to_last_follow_up)==TRUE)]
+
+status_recidive=rep(NA, length(New_tumor_event))
+status_recidive[which(is.na(New_tumor_event)==TRUE)]=0
+status_recidive[which(is.na(New_tumor_event)==FALSE)]=1 #on met des 1 si la personne rechute
+status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne récidive
+
+
+head(cbind(Suivi_progression, status_recidive, Suivi_Mort, status_mort),10)
+```
+
+```{r}
+library(survival)
+library(survminer)
+
+```
+```{r}
+B=ClassTum
+
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
+
+Quant2=rep(NA, dim(dds_tableTOT_breast)[2])
+Quant2[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+#Quant2[which(A<quantile(A, na.rm=T, 0.75))]="Int"
+Quant2[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+
+mydata=data.frame(time=Suivi_progression[which(Type_sample!="Solid Tissue Normal")],
+                  status=status_recidive[which(Type_sample!="Solid Tissue Normal")],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal")])
+
+# List of ggsurvplots
+splots <- list()
+
+fit_recid=survfit(Surv(time,status)~Decile,data=mydata)
+
+splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
+   legend = "bottom", 
+   legend.title = "Breast",
+   legend.labs = c("High", "Low"),
+   palette = c("red4", "green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive TSP Nat Com",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+
+#2e plot = survie globale
+mydata2=data.frame(time=Suivi_Mort[which(Type_sample!="Solid Tissue Normal")],
+                  status=status_mort[which(Type_sample!="Solid Tissue Normal")],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal")])
+summary(as.factor(mydata$status))
+
+fit_mort=survfit(Surv(time,status)~Decile,data=mydata2)
+
+splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
+   legend = "bottom", 
+   legend.title = "Breast",
+  legend.labs = c("High", "Low"),
+   palette = c("red4","green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive TSP Nat Com",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+   
+# Arrange multiple ggsurvplots and print the output
+arrange_ggsurvplots(splots, print = TRUE, title="Breast Adam12 Survie",
+  ncol = 2, nrow = 1, risk.table.height = 0.3)
+```
+
+
+#Modèles de Cox
+```{r}
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
+
+ADAM12=rep(NA, dim(dds_tableTOT_breast)[1])
+ADAM12[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+ADAM12[which(A<quantile(A, na.rm=T, 0.9))]="Int"
+ADAM12[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+ADAM12=as.factor(ADAM12)
+ADAM12=factor(ADAM12, levels(ADAM12)[c(2,1,3)]) #pour réordonner les niveaux des facteurs
+
+#on enlève les valeurs normales
+ADAM12[which(Type_sample=="Solid Tissue Normal")]=NA
+
+Age=c(coldata_rse_breast$xml_age_at_initial_pathologic_diagnosis)
+Age[which(coldata_rse_breast$xml_age_at_initial_pathologic_diagnosis<=75)]="50-75"
+Age[which(coldata_rse_breast$xml_age_at_initial_pathologic_diagnosis<=55)]="<=50"
+Age[which(coldata_rse_breast$xml_age_at_initial_pathologic_diagnosis>75)]=">75"
+Age=as.factor(Age)
+Age=factor(Age, levels(Age)[c(3,1:2)])
+
+Stage=c(coldata_rse_breast$cgc_case_pathologic_stage)
+levels(as.factor(Stage))
+length(Stage)
+Stage[which(is.element(Stage, c("Stage I","Stage IA","Stage IB","Stage II","Stage IIA","Stage IIB"))==TRUE)]="Stage I-II"
+Stage[which(is.element(Stage, c( "Stage III"  ,"Stage IIIA", "Stage IIIB", "Stage IIIC", "Stage IV"))==T)]="Stage III-IV"
+Stage[which(is.element(Stage, c( "Stage Tis" , "Stage X"))==T)]=NA
+head(Stage)
+Stage=as.factor(as.character(Stage))
+summary(as.factor(as.character(Stage)))
+
+ClassTum=rep(NA, length(clab_breast$Stage))
+ClassTum[which(clab_breast$ER=="Negative"&clab_breast$PR=="Negative"&clab_breast$HER2=="Negative")]="Triple negative"
+ClassTum[which(clab_breast$ER=="Positive")]="HR"
+ClassTum[which(clab_breast$PR=="Positive")]="HR"
+ClassTum[which(clab_breast$HER2=="Positive")]="HER2"
+ClassTum[which(clab_breast$HER2=="Equivocal")]=NA
+ClassTum=as.factor(ClassTum)
+ClassTum=factor(ClassTum, levels(ClassTum)[c(1,2,3)]) #pour réordonner les niveaux des facteurs
+
+
+mydata=data.frame(time=Suivi_progression[which(Type_sample!="Solid Tissue Normal")],
+                  status=status_recidive[which(Type_sample!="Solid Tissue Normal")],
+                  Stage=as.factor(Stage[which(Type_sample!="Solid Tissue Normal")]),
+                  ADAM12=ADAM12[which(Type_sample!="Solid Tissue Normal")],
+                  Age=Age[which(Type_sample!="Solid Tissue Normal")],
+                  ClassTum=ClassTum[which(Type_sample!="Solid Tissue Normal")])
+res.cox.r=coxph( Surv(time, status) ~ ADAM12 + Stage + Age +ClassTum ,
+                data = mydata )
+res.cox.r
+```
+
+Pour tracer le forest plot
+```{r}
+plot=ggforest(res.cox.r, main="Hazard Ratio recidive")
+plot=plot+theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))
+print(plot)
+```
+
+
+
+
+```{r}
+#On récupere les labels des échantillons sélectionnés, on ajoute une colonne contenant le groupe ADAM, et une colonne contenant le type de tissu
+clab_ADAM_CRC=cbind(clab_CRC[c(c(which(is.element(colnames(dds_tableTOT_CRC), NT_CRC)==TRUE)),
+                              c(which(is.element(colnames(dds_tableTOT_CRC), low_ADAM_CRC)==TRUE)),
+                    c(which(is.element(colnames(dds_tableTOT_CRC), high_ADAM_CRC)==TRUE))),],
+                    Decile=c(rep("NT",length(NT_CRC)),
+                         rep("tumor_low_ADAM",length(low_ADAM_CRC)),
+                         rep("tumor_high_ADAM",length(low_ADAM_CRC))),
+                    Tissue=c(rep("CRC", sum(length(NT_CRC),length(low_ADAM_CRC),length(low_ADAM_CRC)))))
+
+clab_ADAM_lung=cbind(clab_lung[c(c(which(is.element(colnames(dds_tableTOT_lung), NT_lung)==TRUE)),
+                              c(which(is.element(colnames(dds_tableTOT_lung), low_ADAM_lung)==TRUE)),
+                    c(which(is.element(colnames(dds_tableTOT_lung), high_ADAM_lung)==TRUE))),],
+                    Decile=c(rep("NT",length(NT_lung)),
+                         rep("tumor_low_ADAM",length(low_ADAM_lung)),
+                         rep("tumor_high_ADAM",length(low_ADAM_lung))),
+                    Tissue=c(rep("lung", sum(length(NT_lung),length(low_ADAM_lung),length(low_ADAM_lung)))))
+
+clab_ADAM_breast=cbind(clab_breast[c(c(which(is.element(colnames(dds_tableTOT_breast), NT_breast)==TRUE)),
+                              c(which(is.element(colnames(dds_tableTOT_breast), low_ADAM_breast)==TRUE)),
+                    c(which(is.element(colnames(dds_tableTOT_breast), high_ADAM_breast)==TRUE))),],
+                    Decile=c(rep("NT",length(NT_breast)),
+                         rep("tumor_low_ADAM",length(low_ADAM_breast)),
+                         rep("tumor_high_ADAM",length(low_ADAM_breast))),
+                    Tissue=c(rep("breast", sum(length(NT_breast),length(low_ADAM_breast),length(low_ADAM_breast)))))
+
+clab_ADAM_tot=cbind(Decile=c(as.character(clab_ADAM_CRC$Decile),as.character(clab_ADAM_lung$Decile),as.character(clab_ADAM_breast$Decile)),
+                    Tissue=c(as.character(clab_ADAM_CRC$Tissue),as.character(clab_ADAM_lung$Tissue),as.character(clab_ADAM_breast$Tissue)))
+```
+
+```{r}
+#on construit les subsets de dds_tot avec ces samples là
+ComparADAM_ddsTOT_CRC=dds_tableTOT_CRC[,c(which(is.element(colnames(dds_tableTOT_CRC), NT_CRC)==TRUE),
+                                which(is.element(colnames(dds_tableTOT_CRC), low_ADAM_CRC)==TRUE),
+                                which(is.element(colnames(dds_tableTOT_CRC), high_ADAM_CRC)==TRUE))]
+ComparADAM_ddsTOT_NT_CRC=dds_tableTOT_CRC[,c(which(is.element(colnames(dds_tableTOT_CRC), NT_CRC)==TRUE))]
+
+ComparADAM_ddsTOT_lung=dds_tableTOT_lung[,c(which(is.element(colnames(dds_tableTOT_lung), NT_lung)==TRUE),
+                                which(is.element(colnames(dds_tableTOT_lung), low_ADAM_lung)==TRUE),
+                                which(is.element(colnames(dds_tableTOT_lung), high_ADAM_lung)==TRUE))]
+ComparADAM_ddsTOT_NT_lung=dds_tableTOT_lung[,c(which(is.element(colnames(dds_tableTOT_lung), NT_lung)==TRUE))]
+
+ComparADAM_ddsTOT_breast=dds_tableTOT_breast[,c(which(is.element(colnames(dds_tableTOT_breast), NT_breast)==TRUE),
+                                which(is.element(colnames(dds_tableTOT_breast), low_ADAM_breast)==TRUE),
+                                which(is.element(colnames(dds_tableTOT_breast), high_ADAM_breast)==TRUE))]
+ComparADAM_ddsTOT_NT_breast=dds_tableTOT_breast[,c(which(is.element(colnames(dds_tableTOT_breast), NT_breast)==TRUE))]
+
+ComparADAM_ddsTOT_total=cbind(ComparADAM_ddsTOT_CRC,ComparADAM_ddsTOT_lung,ComparADAM_ddsTOT_breast)
+```
+
+
+#Activation TAK1 à partir des gènes cibles d'oli*
+
+
+On veut normaliser les gènes cibles de TAK1 par rapport à leur niveau d'expression basal dans les tissus normaux correspondants
+
+Le vecteur contenant le nom des gènes TAK1 est SignatureTAK1
+
+Construction subset et calcul signatire TAK1
+-----------------
+```{r}
+rm(SignatureTAK1)
+SignatureTAK1=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180310_Signature_TAK1/SIgnatureTAK1pos.txt", header=F, sep="\t")
+#SignatureTAK1=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/180310_Signature_TAK1/SIgnatureTAK1neg.txt", header=F, sep="\t")
+
+head(SignatureTAK1)
+
+library("psych")
+subADAM_TAK1_b=ComparADAM_ddsTOT_breast[which(is.element(rownames(ComparADAM_ddsTOT_breast), SignatureTAK1$V1)==TRUE),]
+subADAM_TAK1_l=ComparADAM_ddsTOT_lung[which(is.element(rownames(ComparADAM_ddsTOT_breast), SignatureTAK1$V1)==TRUE),]
+subADAM_TAK1_c=ComparADAM_ddsTOT_CRC[which(is.element(rownames(ComparADAM_ddsTOT_breast), SignatureTAK1$V1)==TRUE),]
+
+#####################Calcul des FC
+#on veut calculer un FC tumeur contre tissu normal
+Median_NT_CRC=c()#on calcule la moyenne géometrique (Update Oli) des scores MCP pour les tissus normaux
+for (i in seq(1,dim(subADAM_TAK1_c)[1])) {
+  Median_NT_CRC=c(Median_NT_CRC, median(as.matrix(subADAM_TAK1_c)[i,1:41]))
+}
+Median_NT_lung=c()
+for (i in seq(1,dim(subADAM_TAK1_l)[1])) {
+  Median_NT_lung=c(Median_NT_lung, median(as.matrix(subADAM_TAK1_l)[i,1:110]))
+}
+Median_NT_breast=c()
+for (i in seq(1,dim(subADAM_TAK1_b)[1])) {
+  Median_NT_breast=c(Median_NT_breast, median(as.matrix(subADAM_TAK1_b)[i,1:112]))
+}
+
+#on divise toutes les valeurs par cette mediane : on obtient un score relatif d'enrichissement
+for(i in seq(1, dim(subADAM_TAK1_c)[1])) {
+subADAM_TAK1_c[i,]=subADAM_TAK1_c[i,]/Median_NT_CRC[i]
+}
+for(i in seq(1, dim(subADAM_TAK1_l)[1])) {
+subADAM_TAK1_l[i,]=subADAM_TAK1_l[i,]/Median_NT_lung[i]
+}
+for(i in seq(1, dim(subADAM_TAK1_b)[1])) {
+subADAM_TAK1_b[i,]=subADAM_TAK1_b[i,]/Median_NT_breast[i]
+}
+#Et on assemble le tout
+subADAM_TAK1_norm_tot=cbind(subADAM_TAK1_c,subADAM_TAK1_l,subADAM_TAK1_b)
+
+#####################################################################pour la heatmap
+
+```
+Si on divise les heatmaps
+
+Heatmap Breast
+--------------
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+#Pour le sein
+
+breastsubADAM_TAK1_norm_tot=subADAM_TAK1_norm_tot[,which(as.data.frame(clab_ADAM_tot)$Tissue=="breast")]
+
+B=which(is.na(rowSums(breastsubADAM_TAK1_norm_tot))==T)
+#breastsubADAM_TAK1_norm_tot=na.omit(breastsubADAM_TAK1_norm_tot)
+
+for (i in c(1:dim(breastsubADAM_TAK1_norm_tot)[2])) {
+  breastsubADAM_TAK1_norm_tot[which(breastsubADAM_TAK1_norm_tot[,i]==0),i]=NA
+  breastsubADAM_TAK1_norm_tot[which(breastsubADAM_TAK1_norm_tot[,i]==Inf),i]=NA
+   breastsubADAM_TAK1_norm_tot[which(is.nan(breastsubADAM_TAK1_norm_tot[,i])==T),i]=NA
+}
+#View(breastsubADAM_TAK1_norm_tot)
+breastsubADAM_TAK1_norm_tot=na.omit(breastsubADAM_TAK1_norm_tot)
+
+Label_col=as.data.frame(as.data.frame(clab_ADAM_tot)$Decile[which(as.data.frame(clab_ADAM_tot)$Tissue=="breast")])
+head(Label_col)
+colnames(Label_col)="Decile"
+levels(as.factor(Label_col$Decile))
+
+Liste=list(Decile=c("NT"="white", "tumor_high_ADAM"="red4", "tumor_low_ADAM"="green4"))
+
+ha= HeatmapAnnotation(df = Label_col,
+                       col =  Liste,
+                       annotation_legend_param = list(title_gp = gpar(fontsize = 8),
+        labels_gp = gpar(fontsize = 6),grid_height = unit(3, "mm")),
+        annotation_height =unit(0.5, "cm"))
+
+
+#Premiere heatmap SEIN
+#ComplexHeatmap::Heatmap(as.matrix(breastsubADAM_TAK1_norm_tot))
+
+
+Heatmap(as.matrix(log2(breastsubADAM_TAK1_norm_tot)), 
+   name="FC",
+   cluster_columns = TRUE, 
+    clustering_distance_columns = "euclidean",
+    clustering_method_columns = "ward.D2",
+   column_title = "Breast samples", #titre
+   column_title_gp = gpar(fontsize = 10),
+    km = 3,
+   row_title_gp = gpar(fontsize = c(6,6)),
+    show_column_names = FALSE, #pas de nom des éch
+    show_row_names = FALSE, #ni des gènes
+    top_annotation = ha, #en top, les anno Cancer / NT etc
+   top_annotation_height = unit(0.7, "cm"),
+    show_heatmap_legend = TRUE,
+  col = colorRamp2(c(-10,-2,-1.5, 0,1.5,2, 10), c("blue","cyan","black", "black","black","yellow", "orange"))
+    #heatmap_legend_param = list(legend_direction = "vertical",
+    #legend_width = unit(3, "cm"), title_position = "topcenter",fontsize = 6)
+) #on ajoute les anno lignes
+
+
+```
+Corrélation
+---------
+```{r}
+ADAM_TAK1_b=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),]
+ADAM_TAK1_l=dds_tableTOT_lung[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),]
+ADAM_TAK1_c=dds_tableTOT_CRC[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),]
+
+#####################Calcul des FC
+#on veut calculer un FC tumeur contre tissu normal
+Median_NT_CRC=c()#on calcule la moyenne géometrique (Update Oli) des scores MCP pour les tissus normaux
+for (i in seq(1,dim(ADAM_TAK1_c)[1])) {
+  Median_NT_CRC=c(Median_NT_CRC, median(as.matrix(ADAM_TAK1_c)[i,1:41]))
+}
+Median_NT_lung=c()
+for (i in seq(1,dim(ADAM_TAK1_l)[1])) {
+  Median_NT_lung=c(Median_NT_lung, median(as.matrix(ADAM_TAK1_l)[i,1:110]))
+}
+Median_NT_breast=c()
+for (i in seq(1,dim(ADAM_TAK1_b)[1])) {
+  Median_NT_breast=c(Median_NT_breast, median(as.matrix(ADAM_TAK1_b)[i,1:112]))
+}
+
+#on divise toutes les valeurs par cette mediane : on obtient un score relatif d'enrichissement
+for(i in seq(1, dim(ADAM_TAK1_c)[1])) {
+ADAM_TAK1_c[i,]=ADAM_TAK1_c[i,]/Median_NT_CRC[i]
+}
+for(i in seq(1, dim(ADAM_TAK1_l)[1])) {
+ADAM_TAK1_l[i,]=ADAM_TAK1_l[i,]/Median_NT_lung[i]
+}
+for(i in seq(1, dim(ADAM_TAK1_b)[1])) {
+ADAM_TAK1_b[i,]=ADAM_TAK1_b[i,]/Median_NT_breast[i]
+}
+#Et on assemble le tout
+ADAM_TAK1_norm_tot=cbind(ADAM_TAK1_c,ADAM_TAK1_l,ADAM_TAK1_b)
+```
+
+
+```{r}
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
+
+Type=rep("Int", dim(dds_tableTOT_breast)[2])
+Type[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+Type[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+Type=Type[-which(clab_breast=="Solid Tissue Normal")]
+Type=as.factor(Type)
+
+for (i in c(1:dim(ADAM_TAK1_b)[2])) {
+  ADAM_TAK1_b[which(ADAM_TAK1_b[,i]==Inf),i]=NA
+    ADAM_TAK1_b[which(log2(ADAM_TAK1_b[,i])==-Inf),i]=NA
+   ADAM_TAK1_b[which(is.nan(ADAM_TAK1_b[,i])==T),i]=NA
+}
+
+
+MafonctionSum=function(X){
+  X=sum(X, na.rm =TRUE) 
+}
+
+Tak1_all=apply((log2(ADAM_TAK1_b)),
+               2,
+               MafonctionSum)
+
+Adam=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
+
+
+#Score TAK1 par colonne
+
+data=data.frame(Tak=Tak1_all,
+           Adam=t(Adam),
+           Type=Type)
+colnames(data)=c("Tak","Adam", "Type")
+head(data)
+```
+```{r}
+equation = function(x) {
+  lm_coef <- list(r = round(x$r[1,2], digits = 2),
+                  P = x$P[1,2]);
+  lm_eq <- substitute(bold(Pearson)*":"~~italic(R) == r*","~~italic(pvalue)~"="~P,lm_coef)
+  as.character(as.expression(lm_eq));                 
+}
+```
+
+```{r}
+#Coeff de corrélation
+xm = as.matrix(data[,1:2])
+#head(xm[,])
+library("Hmisc")
+
+M <-  rcorr(xm, type = "pearson")
+M
+
+TAK1_ADAM12=M$r[1,2]
+
+library(ggplot2)
+ggplot(data=data, aes(x=log2(Adam), y=Tak, color=Type))+
+  geom_point()+
+  geom_smooth(colour = "black",fill="white", method = "lm") +
+  scale_color_manual(values=c("red4", "black","green4"))+
+  labs(title="Correlation ADAM12 & TAK1 activation \n All Tumors (Breast)", y="TAK1 activation Score",x="log2(ADAM12 expression)",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+      annotate("text", x = 15.05, y = 400.05, label = equation(M), parse = TRUE)
+```
+
+
+
+
+
+##Corrélation KAT2A /TAK1
+```{r}
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]
+
+Type=rep("Int", dim(dds_tableTOT_breast)[2])
+Type[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+Type[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+Type=Type[-which(clab_breast=="Solid Tissue Normal")]
+Type=as.factor(Type)
+
+KAT2A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]
+
+
+#Score TAK1 par colonne
+
+data=data.frame(Tak=Tak1_all,
+           KAT2A=t(KAT2A),
+           Type=Type)
+colnames(data)=c("Tak","KAT2A", "Type")
+head(data)
+
+#Coeff de corrélation
+xm = as.matrix(data[,1:2])
+#head(xm[,])
+library("Hmisc")
+
+M <-  rcorr(xm, type = "pearson")
+M
+
+TAK1_KAT2A=M$r[1,2]
+
+library(ggplot2)
+ggplot(data=data, aes(x=log2(KAT2A), y=Tak, color=Type))+
+  geom_point()+
+  geom_smooth(colour = "black",fill="white", method = "lm") +
+  scale_color_manual(values=c("red4", "black","green4"))+
+  labs(title="Correlation KAT2A & TAK1 activation \n All Tumors (Breast)", y="TAK1 activation Score",x="log2(KAT2A expression)",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+      annotate("text", x = 17.05, y = 400.05, label = equation(M), parse = TRUE)
+
+```
+
+
+
+
+
+
+##???SIRT6
+
+
+```{r}
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="SIRT6"),]
+
+Type=rep("Int", dim(dds_tableTOT_breast)[2])
+Type[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+Type[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+Type=Type[-which(clab_breast=="Solid Tissue Normal")]
+Type=as.factor(Type)
+
+SIRT6=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="SIRT6"),]
+
+
+#Score TAK1 par colonne
+
+data=data.frame(Tak=Tak1_all,
+           SIRT6=t(SIRT6),
+           Type=Type)
+colnames(data)=c("Tak","SIRT6", "Type")
+head(data)
+
+#Coeff de corrélation
+xm = as.matrix(data[,1:2])
+#head(xm[,])
+library("Hmisc")
+
+M <-  rcorr(xm, type = "pearson")
+M
+library(ggplot2)
+ggplot(data=data, aes(x=log2(SIRT6), y=Tak, color=Type))+
+  geom_point()+
+  geom_smooth(colour = "black",fill="white", method = "lm") +
+  scale_color_manual(values=c("red4", "black","green4"))+
+  labs(title="Correlation SIRT6 & TAK1 activation \n All Tumors (Breast)", y="TAK1 activation Score",x="log2(SIRT6 expression)",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+      annotate("text", x = 17.05, y = 400.05, label = equation(M), parse = TRUE)
+```
+
+##.Pie chart
+```{r}
+library("gridExtra")
+
+data=data.frame(class=c("TAK1-independant", "TAK1-dependant"),
+                Num=round(c(171,339)/c(171+339),2))
+data
+
+
+theme_update(panel.background = element_blank(),
+             panel.grid.major= element_blank(), 
+             panel.grid.minor = element_blank(), 
+             axis.text.x = element_blank(), 
+             axis.text.y = element_blank(),
+             axis.ticks.y = element_blank(),
+             axis.ticks.x = element_blank(),
+             axis.title.y = element_blank(),
+             axis.title.x = element_blank(),
+             legend.position="right",
+             legend.text=element_text(size=10),
+             legend.title=element_text(size=10))
+
+ggTS_NT=ggplot(data = data, mapping = aes(x = factor(1), y = Num, fill = class)) +
+  geom_bar(width=1, stat = "identity", color="black") +
+  coord_polar(theta = "y") + 
+  scale_fill_manual(values=c("goldenrod3", "grey70"))+
+  geom_text(aes(x = c(1, 1), #jouer sur ce paramètre pour placer les légendes : distance au centre
+                y = Num/2 + c(0, cumsum(Num)[-length(Num)]), 
+                label=paste(Num*100, "%")), family = "Consolas",
+            color=c("black", "black"))+
+  ggtitle("TAK1 target genes")+
+   theme(
+         legend.direction	= "vertical",
+         plot.title = element_text(size = 14, face = "bold",hjust = 0.5))
+
+
+grid.arrange(ggTS_NT,
+             ncol=1, nrow=1)
+```
+
+
+heatmap Colon
+----------
+```{r}
+CRCsubADAM_TAK1_norm_tot=subADAM_TAK1_norm_tot[,which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC")]
+Label_col=data.frame(Decile=(rep(NA,dim(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC"),])[1] )))
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC"),])$Decile=="NT")]="white"
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC"),])$Decile=="tumor_high_ADAM")]="black"
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC"),])$Decile=="tumor_low_ADAM")]="grey"
+
+CRCrow_names <- rep(" ", nrow(subADAM_TAK1_norm_tot))
+CRCrow_names[which(is.element(rownames(subADAM_TAK1_norm_tot), c("ADAM12"))==TRUE)]="ADAM12"
+
+#Les clsuters
+Colv  <- log2(as.matrix(1+CRCsubADAM_TAK1_norm_tot)) %>% na.omit %>%  t %>% dist %>% hclust(method="ward.D") %>% as.dendrogram %>%
+   set("branches_k_color", k = 3, value = rep(c("black", "grey50","grey80"),3)) %>%
+   set("branches_lwd", 1.2) %>%
+   ladderize
+
+
+heatmap.3(na.omit(log2(as.matrix(CRCsubADAM_TAK1_norm_tot+1))),#on passe au log2 pour centrer la distribiution
+          main="TAK1 signature _ CRC",
+          ColSideColorsSize=2,
+          Colv=Colv,
+          breaks = col_breaks,
+          ColSideColors = as.matrix(Label_col$Decile), #Pour indiquer la nature de lechantillon
+          col = colorRamp2(c(-10,-2,-1, 0,1,2, 10), 
+                           c("blue","cyan","black", "black","black","yellow", "orange")),
+          dendrogram="col",     # only draw a row dendrogram
+          key=TRUE, 
+          density.info="histogram",
+          labRow = CRCrow_names,
+          cexRow=0.5,
+          labCol=FALSE,
+          margins = c(10,15))
+legend("topright",legend=c("Normal","Tumor_high ADAM12","Tumor_low ADAM12"),
+fill=c("white","black","grey"), border=TRUE, bty="n", y.intersp = 0.7, cex=0.7)
+```
+```{r}
+breastsubADAM_TAK1_norm_tot=subADAM_TAK1_norm_tot[,which(as.data.frame(clab_ADAM_tot)$Tissue=="breast")]
+Label_col=data.frame(Decile=(rep(NA,dim(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="breast"),])[1] )))
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="breast"),])$Decile=="NT")]="white"
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="breast"),])$Decile=="tumor_high_ADAM")]="black"
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="breast"),])$Decile=="tumor_low_ADAM")]="grey"
+
+breastrow_names <- rep(" ", nrow(subADAM_TAK1_norm_tot))
+breastrow_names[which(is.element(rownames(subADAM_TAK1_norm_tot), c("ADAM12"))==TRUE)]="ADAM12"
+
+#Les clsuters
+Colv  <- log2(as.matrix(1+breastsubADAM_TAK1_norm_tot)) %>% na.omit %>%  t %>% dist %>% hclust(method="ward.D2") %>% as.dendrogram %>%
+   set("branches_k_color", k = 3, value = rep(c("black", "grey50","grey80"),3)) %>%
+   set("branches_lwd", 1.2) %>%
+   ladderize
+
+
+heatmap.3(na.omit(log2(as.matrix(breastsubADAM_TAK1_norm_tot+1))),#on passe au log2 pour centrer la distribiution
+          main="TAK1 signature _ BREAST",
+          ColSideColorsSize=2,
+          Colv=Colv,
+          breaks = col_breaks,
+          ColSideColors = as.matrix(Label_col$Decile), #Pour indiquer la nature de lechantillon
+          col=my_palette,
+          dendrogram="col",     # only draw a row dendrogram
+          key=TRUE, 
+          density.info="histogram",
+          labRow = breastrow_names,
+          cexRow=0.5,
+          labCol=FALSE,
+          margins = c(10,15))
+legend("topright",legend=c("Normal","Tumor_high ADAM12","Tumor_low ADAM12"),
+fill=c("white","black","grey"), border=TRUE, bty="n", y.intersp = 0.7, cex=0.7)
+```
+```{r}
+lungsubADAM_TAK1_norm_tot=subADAM_TAK1_norm_tot[,which(as.data.frame(clab_ADAM_tot)$Tissue=="lung")]
+Label_col=data.frame(Decile=(rep(NA,dim(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="lung"),])[1] )))
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="lung"),])$Decile=="NT")]="white"
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="lung"),])$Decile=="tumor_high_ADAM")]="black"
+Label_col$Decile[which(as.data.frame(clab_ADAM_tot[which(as.data.frame(clab_ADAM_tot)$Tissue=="lung"),])$Decile=="tumor_low_ADAM")]="grey"
+
+lungrow_names <- rep(" ", nrow(subADAM_TAK1_norm_tot))
+lungrow_names[which(is.element(rownames(subADAM_TAK1_norm_tot), c("ADAM12"))==TRUE)]="ADAM12"
+
+#Les clsuters
+Colv  <- log2(as.matrix(1+lungsubADAM_TAK1_norm_tot)) %>% na.omit %>%  t %>% dist %>% hclust(method="ward.D2") %>% as.dendrogram %>%
+   set("branches_k_color", k = 3, value = rep(c("black", "grey50","grey80"),3)) %>%
+   set("branches_lwd", 1.2) %>%
+   ladderize
+
+
+heatmap.3(na.omit(log2(as.matrix(lungsubADAM_TAK1_norm_tot+1))),#on passe au log2 pour centrer la distribiution
+          main="TAK1 signature _ LUNG",
+          ColSideColorsSize=2,
+          Colv=Colv,
+          breaks = col_breaks,
+          ColSideColors = as.matrix(Label_col$Decile), #Pour indiquer la nature de lechantillon
+          col=my_palette,
+          dendrogram="col",     # only draw a row dendrogram
+          key=TRUE, 
+          density.info="histogram",
+          labRow = lungrow_names,
+          cexRow=0.5,
+          labCol=FALSE,
+          margins = c(10,15))
+legend("topright",legend=c("Normal","Tumor_high ADAM12","Tumor_low ADAM12"),
+fill=c("white","black","grey"), border=TRUE, bty="n", y.intersp = 0.7, cex=0.7)
+```
+
+
+
+#**Expression relative de KAT2A et SIRT6 : **
+____________________________________________
+```{r}
+geneint=c("ADAM12","COL6A1","COL6A2","COL6A3","MAP3K7","SIRT6","KAT2A","CDKN2B","CDKN1A","CDKN1B","IL6","SMAD7","CDC25A","MYC","ID1","ID2","ID3", "CLDN3","CLDN4","CLDN7","CDH1","CDH2","TJP1","DSP","VIM","ESR1","PGR","ERBB2","TGFB1","COL1A1","MMP2","ZBTB4","ADAM19")
+subADAM_table_CRC=ComparADAM_ddsTOT_CRC[which(is.element(rownames(ComparADAM_ddsTOT_CRC), geneint)==TRUE),]
+subADAM_table_NT_CRC=ComparADAM_ddsTOT_NT_CRC[which(is.element(rownames(ComparADAM_ddsTOT_NT_CRC), geneint)==TRUE),]
+
+subADAM_table_lung=ComparADAM_ddsTOT_lung[which(is.element(rownames(ComparADAM_ddsTOT_lung), geneint)==TRUE),]
+subADAM_table_NT_lung=ComparADAM_ddsTOT_NT_lung[which(is.element(rownames(ComparADAM_ddsTOT_NT_lung), geneint)==TRUE),]
+
+subADAM_table_breast=ComparADAM_ddsTOT_breast[which(is.element(rownames(ComparADAM_ddsTOT_breast), geneint)==TRUE),]
+subADAM_table_NT_breast=ComparADAM_ddsTOT_NT_breast[which(is.element(rownames(ComparADAM_ddsTOT_NT_breast), geneint)==TRUE),]
+
+gene=rownames(subADAM_table_CRC)
+
+#colonne Decile pour nv exp ADAM, gene pour nom des gènes
+subADAM_CRC=data.frame(stack(subADAM_table_CRC),
+                   Decile=c(rep("NT",length(ADAM_NT_CRC)*length(gene)),
+                         rep("tumor_low_ADAM12",length(low_ADAM_CRC)*length(gene)),
+                         rep("tumor_high_ADAM12",length(high_ADAM_CRC)*length(gene))), 
+                   Gene=rep(gene, sum(length(ADAM_NT_CRC),length(low_ADAM_CRC),length(high_ADAM_CRC))))
+
+subADAM_lung=data.frame(stack(subADAM_table_lung),
+                   Decile=c(rep("NT",length(ADAM_NT_lung)*length(gene)),
+                         rep("tumor_low_ADAM12",length(low_ADAM_lung)*length(gene)),
+                         rep("tumor_high_ADAM12",length(high_ADAM_lung)*length(gene))), 
+                   Gene=rep(gene, sum(length(ADAM_NT_lung),length(low_ADAM_lung),length(high_ADAM_lung))))
+
+subADAM_breast=data.frame(stack(subADAM_table_breast),
+                   Decile=c(rep("NT",length(ADAM_NT_breast)*length(gene)),
+                         rep("tumor_low_ADAM12",length(low_ADAM_breast)*length(gene)),
+                         rep("tumor_high_ADAM12",length(high_ADAM_breast)*length(gene))), 
+                   Gene=rep(gene, sum(length(ADAM_NT_breast),length(low_ADAM_breast),length(high_ADAM_breast))))
+
+
+#on veut calculer un FC tumeur contre tissu normal
+MeanNT_A12_CRC=c()#on calcule la median des scores MCP pour les tissus normaux
+for (i in seq(1,length(gene))) {
+  MeanNT_A12_CRC=c(MeanNT_A12_CRC, geometric.mean(as.matrix(subADAM_table_NT_CRC)[i,]))
+}
+for(i in seq(1, dim(subADAM_CRC)[1])) {
+subADAM_CRC$values[i]=subADAM_CRC$values[i]/rep(MeanNT_A12_CRC,(sum(length(ADAM_NT_CRC),length(low_ADAM_CRC),length(high_ADAM_CRC))))[i]
+}
+
+MeanNT_A12_lung=c()
+for (i in seq(1,length(gene))) {
+  MeanNT_A12_lung=c(MeanNT_A12_lung, geometric.mean(as.matrix(subADAM_table_NT_lung)[i,]))
+}
+for(i in seq(1, dim(subADAM_lung)[1])) {
+subADAM_lung$values[i]=subADAM_lung$values[i]/rep(MeanNT_A12_lung,(sum(length(ADAM_NT_lung),length(low_ADAM_lung),length(high_ADAM_lung))))[i]
+}
+MeanNT_A12_breast=c()
+for (i in seq(1,length(gene))) {
+  MeanNT_A12_breast=c(MeanNT_A12_breast, geometric.mean(as.matrix(subADAM_table_NT_breast)[i,]))
+}
+for(i in seq(1, dim(subADAM_breast)[1])) {
+subADAM_breast$values[i]=subADAM_breast$values[i]/rep(MeanNT_A12_breast,(sum(length(ADAM_NT_breast),length(low_ADAM_breast),length(high_ADAM_breast))))[i]
+}
+
+#On assemble le tout
+subADAM_tot=data.frame(rbind(subADAM_CRC,subADAM_lung,subADAM_breast),
+                       Type=c(rep("COAD",dim(subADAM_CRC)[1]),
+                              rep("LUNG",dim(subADAM_lung)[1]),
+                              rep("BREAST",dim(subADAM_breast)[1])))
+
+
+
+
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("ADAM12"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="ADAM12", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+    #"COAD","","LUNG","",
+                           "", "BREAST",""))
+
+```
+
+```{r}
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("MAP3K7"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="TAK1", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   # "COAD","","LUNG","",
+    "","BREAST",""))
+
+```
+```{r}
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("KAT2A"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="KAT2A", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   # "COAD","","LUNG","",
+   "" , "BREAST", ""))
+
+```
+```{r}
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("SIRT6"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="SIRT6", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   # "COAD","","LUNG","",
+   " ", "BREAST"," "))
+
+```
+
+##############################
+#TESTS STATS
+_______________________
+
+#en changeant SIRT6 MAP3K7 KAT2A ADAM12
+```{r}
+summary(aov(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "ADAM12"),
+              Type %in% "BREAST")))
+```
+```{r}
+#install.packages('PMCMRplus')
+library(PMCMRplus)
+#?tukeyTest
+
+summary(tukeyTest(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "ADAM12"),
+              Type %in% "BREAST")))
+```
+#Breast TN
+A²12 NT / Tum
+----------------
+```{r}
+B=which(ClassTum=="Triple-negative")
+
+Type=rep(NA, length(clab_breast$Type))
+Type[which(is.element(clab_breast$Type, c("Solid Tissue Normal"))==TRUE)]="Solid Tissue Normal"
+Type[which(is.element(clab_breast$Type, c("Primary Tumor", "Metastatic"))==TRUE)]="Tumor"
+
+head(data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),B]/median(ADAM_NT_breast)),
+                       Type[B]))
+
+
+ggplot(data=data.frame(stack(dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),B]/median(ADAM_NT_breast)),
+                       Type[B]),
+       aes(x=Type, y=log2(values), fill=Type))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=2, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey")+
+  labs(title="ADAM12 Breast TN", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+  scale_x_discrete(limits=c("","Solid Tissue Normal","Tumor",""))+
+  scale_fill_manual(values=c("white","black"))
+
+```
+
+Courbe de survie selon expression ADAM12
+------------------------------------------------------
+```{r}
+
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
+
+Quant2=rep(NA, dim(dds_tableTOT_breast)[2])
+Quant2[which(A>=quantile(A, na.rm=T, 0.5))]="High"
+#Quant2[which(A<quantile(A, na.rm=T, 0.75))]="Int"
+Quant2[which(A<=quantile(A, na.rm=T, 0.5))]="Low"
+
+mydata=data.frame(time=Suivi_progression[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  status=status_recidive[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")])
+
+# List of ggsurvplots
+splots <- list()
+
+fit_recid=survfit(Surv(time,status)~Decile,data=mydata)
+
+splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
+   legend = "bottom", 
+   legend.title = "Breast",
+   legend.labs = c("High", "Low"),
+   palette = c("red4", "green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive TSP Nat Com",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+
+#2e plot = survie globale
+mydata2=data.frame(time=Suivi_Mort[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  status=status_mort[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")])
+summary(as.factor(mydata$status))
+
+fit_mort=survfit(Surv(time,status)~Decile,data=mydata2)
+
+splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
+   legend = "bottom", 
+   legend.title = "Breast",
+  legend.labs = c("High", "Low"),
+   palette = c("red4","green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive TSP Nat Com",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+   
+# Arrange multiple ggsurvplots and print the output
+arrange_ggsurvplots(splots, print = TRUE, title="Breast Adam12 Survie",
+  ncol = 2, nrow = 1, risk.table.height = 0.3)
+```
+survioe TAK1
+-------------
+```{r}
+
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="MAP3K7"),]
+
+Quant2=rep(NA, dim(dds_tableTOT_breast)[2])
+Quant2[which(A>=quantile(A, na.rm=T, 0.5))]="High"
+#Quant2[which(A<quantile(A, na.rm=T, 0.75))]="Int"
+Quant2[which(A<=quantile(A, na.rm=T, 0.5))]="Low"
+
+mydata=data.frame(time=Suivi_progression[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  status=status_recidive[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")])
+
+# List of ggsurvplots
+splots <- list()
+
+fit_recid=survfit(Surv(time,status)~Decile,data=mydata)
+
+splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
+   legend = "bottom", 
+   legend.title = "Breast",
+   legend.labs = c("High", "Low"),
+   palette = c("red4", "green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive TSP Nat Com",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+
+#2e plot = survie globale
+mydata2=data.frame(time=Suivi_Mort[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  status=status_mort[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")])
+summary(as.factor(mydata$status))
+
+fit_mort=survfit(Surv(time,status)~Decile,data=mydata2)
+
+splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
+   legend = "bottom", 
+   legend.title = "Breast",
+  legend.labs = c("High", "Low"),
+   palette = c("red4","green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive TSP Nat Com",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+   
+# Arrange multiple ggsurvplots and print the output
+arrange_ggsurvplots(splots, print = TRUE, title="Breast Adam12 Survie",
+  ncol = 2, nrow = 1, risk.table.height = 0.3)
+```
+Survie KAT2A
+-----------
+```{r}
+
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]
+
+Quant2=rep(NA, dim(dds_tableTOT_breast)[2])
+Quant2[which(A>=quantile(A, na.rm=T, 0.5))]="High"
+#Quant2[which(A<quantile(A, na.rm=T, 0.75))]="Int"
+Quant2[which(A<=quantile(A, na.rm=T, 0.5))]="Low"
+
+mydata=data.frame(time=Suivi_progression[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  status=status_recidive[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")])
+
+# List of ggsurvplots
+splots <- list()
+
+fit_recid=survfit(Surv(time,status)~Decile,data=mydata)
+
+splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
+   legend = "bottom", 
+   legend.title = "Breast",
+   legend.labs = c("High", "Low"),
+   palette = c("red4", "green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive TSP Nat Com",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+
+#2e plot = survie globale
+mydata2=data.frame(time=Suivi_Mort[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  status=status_mort[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&ClassTum=="Triple-negative")])
+summary(as.factor(mydata$status))
+
+fit_mort=survfit(Surv(time,status)~Decile,data=mydata2)
+
+splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
+   legend = "bottom", 
+   legend.title = "Breast",
+  legend.labs = c("High", "Low"),
+   palette = c("red4","green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive TSP Nat Com",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+   
+# Arrange multiple ggsurvplots and print the output
+arrange_ggsurvplots(splots, print = TRUE, title="Breast Adam12 Survie",
+  ncol = 2, nrow = 1, risk.table.height = 0.3)
+```
+
+Heatmap
+-----------
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+#Pour le sein
+
+B=which(ClassTum=="Triple-negative")
+
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),sort(c(B,which(clab_breast$Type=="Solid Tissue Normal")))]
+
+Quant2=rep(NA, dim(dds_tableTOT_breast[,sort(c(B,which(clab_breast2$Type=="Solid Tissue Normal")))])[2])
+Quant2[which(A>=quantile(A, na.rm=T, 0.5))]="High"
+#Quant2[which(A<quantile(A, na.rm=T, 0.75))]="Int"
+Quant2[which(A<=quantile(A, na.rm=T, 0.5))]="Low"
+Quant2[which(clab_breast2$Type[sort(c(B,which(clab_breast2$Type=="Solid Tissue Normal")))]=="Solid Tissue Normal")]="Solid Tissue Normal"
+
+C=which(is.element(Quant2, c("High", "Low", "Solid Tissue Normal"))==T)
+subADAM_TAK1_b_TN=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),]
+subADAM_TAK1_b_TN=subADAM_TAK1_b_TN[,sort(c(B,which(clab_breast2$Type=="Solid Tissue Normal")))]
+subADAM_TAK1_b_TN=subADAM_TAK1_b_TN[,C]
+
+
+subADAM_TAK1_b_NT=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),which(clab_breast2$Type=="Solid Tissue Normal")]
+
+subADAM_TAK1_b_TN=subADAM_TAK1_b_TN/apply(subADAM_TAK1_b_NT, 1, median)
+
+for (i in c(1:dim(subADAM_TAK1_b_TN)[2])) {
+  subADAM_TAK1_b_TN[which(subADAM_TAK1_b_TN[,i]==0),i]=NA
+  subADAM_TAK1_b_TN[which(subADAM_TAK1_b_TN[,i]==Inf),i]=NA
+   subADAM_TAK1_b_TN[which(is.nan(subADAM_TAK1_b_TN[,i])==T),i]=NA
+}
+
+subADAM_TAK1_b_TN=na.omit(subADAM_TAK1_b_TN)
+which((subADAM_TAK1_b_TN)==0)
+
+####### On fait les labels pour ce petit tableau
+
+Label_col=as.data.frame(Quant2[which(is.element(Quant2, c("High", "Low", "Solid Tissue Normal"))==T)])
+head(Label_col)
+names(Label_col)="Decile"
+levels(as.factor(Label_col$Decile))
+
+Liste=list(Decile=c("Solid Tissue Normal"="white", "High"="red4", "Low"="green4"))
+
+ha= HeatmapAnnotation(df = Label_col,
+                       col =  Liste,
+                       annotation_legend_param = list(title_gp = gpar(fontsize = 8),
+        labels_gp = gpar(fontsize = 6),grid_height = unit(3, "mm")),
+        annotation_height =unit(0.5, "cm"))
+
+Heatmap(as.matrix(log2(subADAM_TAK1_b_TN)), 
+   name="expression",
+   cluster_columns = TRUE, 
+    clustering_distance_columns = "euclidean",
+    clustering_method_columns = "ward.D2",
+   column_title = "Breast Triple-negative samples", #titre
+   column_title_gp = gpar(fontsize = 10),
+    km = 3,
+   row_title_gp = gpar(fontsize = c(6,6)),
+    show_column_names = FALSE, #pas de nom des éch
+    show_row_names = FALSE, #ni des gènes
+    top_annotation = ha, #en top, les anno Cancer / NT etc
+   top_annotation_height = unit(0.7, "cm"),
+    show_heatmap_legend = TRUE,
+  col = colorRamp2(c(-10,-3,-1, 0,1,3, 10), c("blue","cyan","black", "black","black","yellow", "orange"))
+    #heatmap_legend_param = list(legend_direction = "vertical",
+    #legend_width = unit(3, "cm"), title_position = "topcenter",fontsize = 6)
+) #on ajoute les anno lignes
+
+```
+
+Boxplot
+--------------------
+```{r}
+
+
+A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),sort(c(B,which(clab_breast$Type=="Solid Tissue Normal")))]
+
+Quant2=rep(NA, dim(dds_tableTOT_breast[,sort(c(B,which(clab_breast$Type=="Solid Tissue Normal")))])[2])
+Quant2[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+#Quant2[which(A<quantile(A, na.rm=T, 0.75))]="Int"
+Quant2[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+Quant2[which(clab_breast$Type[sort(c(B,which(clab_breast$Type=="Solid Tissue Normal")))]=="Solid Tissue Normal")]="Solid Tissue Normal"
+
+
+
+subADAM_TAK1_b_TN=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), c("ADAM12", "SIRT6", "MAP3K7", "KAT2A"))==TRUE),sort(c(B,which(clab_breast$Type=="Solid Tissue Normal")))]
+
+
+subADAM_TAK1_b_NT=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),which(clab_breast$Type=="Solid Tissue Normal")]
+
+subADAM_TAK1_b_TN=subADAM_TAK1_b_TN/apply(subADAM_TAK1_b_NT, 1, median)
+
+data=data.frame(t(subADAM_TAK1_b_TN), Quant2)
+head(data)
+
+
+for (i in c(1:dim(data)[2])) {
+  data[which(data[,i]==0),i]=NA
+  data[which(data[,i]==Inf),i]=NA
+   data[which(is.nan(data[,i])==T),i]=NA
+}
+
+data=na.omit(data)
+which((data)==0)
+
+ggplot(data,
+       aes(x=Quant2, y=log2(ADAM12), fill=Quant2))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="ADAM12", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("red4","green4","white"))+
+  scale_x_discrete(limits=c("", "Solid Tissue Normal",  "High","Low", ""))
+
+```
+```{r}
+
+ggplot(data,
+       aes(x=Quant2, y=log2(MAP3K7), fill=Quant2))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="TAK1", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("red4","green4","white"))+
+  scale_x_discrete(limits=c("", "Solid Tissue Normal",  "High","Low", ""))
+
+```
+```{r}
+
+ggplot(data,
+       aes(x=Quant2, y=log2(KAT2A), fill=Quant2))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="KAT2A", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("red4","green4","white"))+
+  scale_x_discrete(limits=c("", "Solid Tissue Normal",  "High","Low", ""))
+```
+```{r}
+ggplot(data,
+       aes(x=Quant2, y=log2(SIRT6), fill=Quant2))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="SIRT6", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("red4","green4","white"))+
+  scale_x_discrete(limits=c("", "Solid Tissue Normal",  "High","Low", ""))
+
+```
+
+##############################
+TESTS STATS
+----------------------
+en changeant SIRT6 MAP3K7 KAT2A ADAM12
+```{r}
+summary(aov(ADAM12 ~ Quant2, data))
+```
+```{r}
+#install.packages('PMCMRplus')
+library(PMCMRplus)
+#?tukeyTest
+
+summary(tukeyTest(ADAM12 ~ Quant2, data))
+```
+
+
+#LUNG
+A²12 NT / Tum
+----------------
+```{r}
+coldata_lung=colData(rse_gene)
+
+Type=rep(NA, length(clab_lung$Type))
+Type[which(is.element(clab_lung$Type, c("Solid Tissue Normal"))==TRUE)]="Solid Tissue Normal"
+Type[which(is.element(clab_lung$Type, c("Primary Tumor", "Metastatic"))==TRUE)]="Tumor"
+
+
+
+ggplot(data=data.frame(stack(dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),]/median(ADAM_NT_lung)),
+                       Type),
+       aes(x=Type, y=log2(values), fill=Type))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=2, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey")+
+  labs(title="ADAM12 Lung", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+  scale_x_discrete(limits=c("","Solid Tissue Normal","Tumor",""))+
+  scale_fill_manual(values=c("white","black"))
+
+```
+Stat
+----------
+```{r}
+data=data.frame(stack(dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),]/median(ADAM_NT_lung)),
+                       Type)
+head(data)
+```
+
+
+```{r}
+summary(aov(values ~ Type,data))
+```
+```{r}
+#install.packages('PMCMRplus')
+library(PMCMRplus)
+#?tukeyTest
+
+summary(tukeyTest(values ~ Type,data))
+```
+Courbe de survie selon expression ADAM12
+------------------------------------------------------
+```{r}
+
+
+Type_sample=coldata_lung$gdc_cases.samples.sample_type
+
+years_to_death=(coldata_lung$gdc_cases.diagnoses.days_to_death)/(365)
+years_to_last_follow_up=coldata_lung$gdc_cases.diagnoses.days_to_last_follow_up/(365)
+New_tumor_event=(coldata_lung$cgc_case_new_tumor_event_after_initial_treatment)
+
+head(data.frame(years_to_death, years_to_last_follow_up, New_tumor_event))
+
+
+#survie gloable : le premier évenement est la mort
+Suivi_Mort=years_to_last_follow_up
+Suivi_Mort[which(is.na(years_to_death)==FALSE)]=years_to_death[which(is.na(years_to_death)==FALSE)]
+
+status_mort=rep(NA, length(years_to_death))
+status_mort[which(is.na(years_to_death)==TRUE)]=0
+status_mort[which(is.na(years_to_death)==FALSE)]=1
+
+#survie sans progression : le premier évenement est la mort ou la rechute
+Suivi_progression=years_to_last_follow_up
+#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (généralement c'est exclusif)
+Suivi_progression[which(is.na(years_to_last_follow_up)==TRUE)]=years_to_death[which(is.na(years_to_last_follow_up)==TRUE)]
+
+status_recidive=rep(NA, length(New_tumor_event))
+status_recidive[which(is.na(New_tumor_event)==TRUE)]=0
+status_recidive[which(is.na(New_tumor_event)==FALSE)]=1 #on met des 1 si la personne rechute
+status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne récidive
+
+
+head(cbind(Suivi_progression, status_recidive, Suivi_Mort, status_mort),10)
+```
+
+```{r}
+library(survival)
+library(survminer)
+
+#summary(coldata_lung$xml_histological_type)
+#Lung Squamous Cell Carcinoma- Not Otherwise Specified (NOS)
+#Lung Adenocarcinoma- Not Otherwise Specified (NOS)
+#Lung Adenocarcinoma Mixed Subtype
+
+B="Lung Adenocarcinoma Mixed Subtype"
+
+A=dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),]
+
+Quant2=rep(NA, dim(dds_tableTOT_lung)[2])
+Quant2[which(A>=quantile(A, na.rm=T, 0.5))]="High"
+#Quant2[which(A<quantile(A, na.rm=T, 0.75))]="Int"
+Quant2[which(A<=quantile(A, na.rm=T, 0.5))]="Low"
+
+mydata=data.frame(time=Suivi_progression[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)],
+                  status=status_recidive[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)])
+
+# List of ggsurvplots
+splots <- list()
+
+fit_recid=survfit(Surv(time,status)~Decile,data=mydata)
+
+splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
+   legend = "bottom", 
+   legend.title = "Lung",
+   legend.labs = c("High", "Low"),
+   palette = c("red4", "green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+
+#2e plot = survie globale
+mydata2=data.frame(time=Suivi_Mort[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)],
+                  status=status_mort[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)])
+summary(as.factor(mydata$status))
+
+fit_mort=survfit(Surv(time,status)~Decile,data=mydata2)
+
+splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
+   legend = "bottom", 
+   legend.title = "Lung",
+  legend.labs = c("High", "Low"),
+   palette = c("red4","green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+   
+# Arrange multiple ggsurvplots and print the output
+arrange_ggsurvplots(splots, print = TRUE, title="Lung Adam12 Survie",
+  ncol = 2, nrow = 1, risk.table.height = 0.3)
+```
+
+
+Heatmap
+-----------
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+#Pour le sein
+
+lungsubADAM_TAK1_norm_tot=subADAM_TAK1_norm_tot[,which(as.data.frame(clab_ADAM_tot)$Tissue=="lung")]
+
+for (i in c(1:dim(lungsubADAM_TAK1_norm_tot)[2])) {
+  lungsubADAM_TAK1_norm_tot[which(lungsubADAM_TAK1_norm_tot[,i]==0),i]=NA
+  lungsubADAM_TAK1_norm_tot[which(lungsubADAM_TAK1_norm_tot[,i]==Inf),i]=NA
+   lungsubADAM_TAK1_norm_tot[which(is.nan(lungsubADAM_TAK1_norm_tot[,i])==T),i]=NA
+}
+
+lungsubADAM_TAK1_norm_tot=na.omit(lungsubADAM_TAK1_norm_tot)
+which((lungsubADAM_TAK1_norm_tot)==0)
+
+Label_col=as.data.frame(as.data.frame(clab_ADAM_tot)$Decile[which(as.data.frame(clab_ADAM_tot)$Tissue=="lung")])
+head(Label_col)
+colnames(Label_col)="Decile"
+levels(as.factor(Label_col$Decile))
+
+Liste=list(Decile=c("NT"="white", "tumor_high_ADAM"="red4", "tumor_low_ADAM"="green4"))
+
+ha= HeatmapAnnotation(df = Label_col,
+                       col =  Liste,
+                       annotation_legend_param = list(title_gp = gpar(fontsize = 8),
+        labels_gp = gpar(fontsize = 6),grid_height = unit(3, "mm")),
+        annotation_height =unit(0.5, "cm"))
+
+Heatmap(as.matrix(log2(lungsubADAM_TAK1_norm_tot)), 
+   name="expression",
+   cluster_columns = TRUE, 
+    clustering_distance_columns = "euclidean",
+    clustering_method_columns = "ward.D2",
+   column_title = "Lung samples", #titre
+   column_title_gp = gpar(fontsize = 10),
+    km = 3,
+   row_title_gp = gpar(fontsize = c(6,6)),
+    show_column_names = FALSE, #pas de nom des éch
+    show_row_names = FALSE, #ni des gènes
+    top_annotation = ha, #en top, les anno Cancer / NT etc
+   top_annotation_height = unit(0.7, "cm"),
+    show_heatmap_legend = TRUE,
+  col = colorRamp2(c(-10,-2,-1, 0,1,2, 10), c("blue","cyan","black", "black","black","yellow", "orange"))
+    #heatmap_legend_param = list(legend_direction = "vertical",
+    #legend_width = unit(3, "cm"), title_position = "topcenter",fontsize = 6)
+) #on ajoute les anno lignes
+
+```
+Corrélation
+-----------------
+```{r}
+A=dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),]
+
+Type=rep("Int", dim(dds_tableTOT_lung)[2])
+Type[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+Type[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+Type[which(is.element(clab_lung$Type, c("Solid Tissue Normal"))==TRUE)]=NA
+Type=as.factor(Type)
+
+
+#on enlève les valeurs normales
+
+Tak1_all=apply(dds_tableTOT_lung[which(is.element(rownames(dds_tableTOT_lung), SignatureTAK1$V1)==TRUE),],
+               2,
+               sum)
+
+Adam=dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),]
+
+
+#Score TAK1 par colonne
+
+data=data.frame(Tak=Tak1_all,
+           Adam=t(Adam),
+           Type=Type)
+colnames(data)=c("Tak","Adam", "Type")
+head(data)
+
+#Coeff de corrélation
+xm = as.matrix(log2(data[,1:2]+1))
+#head(xm[,])
+library("Hmisc")
+
+M <-  rcorr(xm, type = "pearson")
+M
+library(ggplot2)
+ggplot(data=data, aes(x=log2(1+Adam), y=log2(1+Tak), color=Type))+
+  geom_point()+
+  geom_smooth(colour = "black",fill="white", method = "lm") +
+  scale_color_manual(values=c("red4", "black","green4"))+
+  labs(title="Correlation ADAM12 & TAK1 activation \n All Tumors", y="TAK1 activation Score",x="log2(ADAM12 expression)",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+      annotate("text", x = 15.05, y = 23.05, label = equation(M), parse = TRUE)
+```
+
+Boxplot
+--------------------
+```{r}
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("ADAM12"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="ADAM12", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   #"COAD",
+   "","LUNG",""
+    #"","BREAST",""
+   ))
+
+```
+```{r}
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("MAP3K7"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="TAK1", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   #"COAD",
+   "","LUNG",""
+    #"","BREAST",""
+   ))
+
+```
+```{r}
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("KAT2A"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="KAT2A", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   #"COAD",
+   "","LUNG",""
+    #"","BREAST",""
+   ))
+```
+```{r}
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("SIRT6"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="SIRT6", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   #"COAD",
+   "","LUNG",""
+    #"","BREAST",""
+   ))
+
+```
+
+##############################
+TESTS STATS
+----------------------
+en changeant SIRT6 MAP3K7 KAT2A ADAM12
+```{r}
+summary(aov(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "MAP3K7"),
+              Type %in% "LUNG")))
+```
+```{r}
+#install.packages('PMCMRplus')
+library(PMCMRplus)
+#?tukeyTest
+
+summary(tukeyTest(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "MAP3K7"),
+              Type %in% "LUNG")))
+```
+
+#COAD
+A²12 NT / Tum
+----------------
+```{r}
+#coldata_lung=colData(rse_gene)
+
+Type=rep(NA, length(clab_CRC$Type))
+Type[which(is.element(clab_CRC$Type, c("hotpink"))==TRUE)]="Solid Tissue Normal"
+Type[which(is.element(clab_CRC$Type, c("black", "grey50"))==TRUE)]="Tumor"
+
+
+
+ggplot(data=data.frame(stack(dds_tableTOT_CRC[which(rownames(dds_tableTOT_CRC)=="ADAM12"),]/median(ADAM_NT_CRC)),
+                       Type),
+       aes(x=Type, y=log2(values), fill=Type))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=2, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey")+
+  labs(title="ADAM12 Coad", y="log2(FC) /SNT",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+  scale_x_discrete(limits=c("","Solid Tissue Normal","Tumor",""))+
+  scale_fill_manual(values=c("white","black"))
+
+```
+Stat
+-----------
+```{r}
+data=data.frame(stack(dds_tableTOT_CRC[which(rownames(dds_tableTOT_CRC)=="ADAM12"),]/median(ADAM_NT_CRC)),
+                       Type)
+head(data)
+```
+
+
+```{r}
+summary(aov(values ~ Type,data))
+```
+```{r}
+#install.packages('PMCMRplus')
+library(PMCMRplus)
+#?tukeyTest
+
+summary(tukeyTest(values ~ Type,data))
+```
+
+Courbe de survie selon expression ADAM12
+------------------------------------------------------
+```{r}
+
+
+Type_sample=coldata_lung$gdc_cases.samples.sample_type
+
+years_to_death=(coldata_lung$gdc_cases.diagnoses.days_to_death)/(365)
+years_to_last_follow_up=coldata_lung$gdc_cases.diagnoses.days_to_last_follow_up/(365)
+New_tumor_event=(coldata_lung$cgc_case_new_tumor_event_after_initial_treatment)
+
+head(data.frame(years_to_death, years_to_last_follow_up, New_tumor_event))
+
+
+#survie gloable : le premier évenement est la mort
+Suivi_Mort=years_to_last_follow_up
+Suivi_Mort[which(is.na(years_to_death)==FALSE)]=years_to_death[which(is.na(years_to_death)==FALSE)]
+
+status_mort=rep(NA, length(years_to_death))
+status_mort[which(is.na(years_to_death)==TRUE)]=0
+status_mort[which(is.na(years_to_death)==FALSE)]=1
+
+#survie sans progression : le premier évenement est la mort ou la rechute
+Suivi_progression=years_to_last_follow_up
+#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (généralement c'est exclusif)
+Suivi_progression[which(is.na(years_to_last_follow_up)==TRUE)]=years_to_death[which(is.na(years_to_last_follow_up)==TRUE)]
+
+status_recidive=rep(NA, length(New_tumor_event))
+status_recidive[which(is.na(New_tumor_event)==TRUE)]=0
+status_recidive[which(is.na(New_tumor_event)==FALSE)]=1 #on met des 1 si la personne rechute
+status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne récidive
+
+
+head(cbind(Suivi_progression, status_recidive, Suivi_Mort, status_mort),10)
+```
+
+```{r}
+library(survival)
+library(survminer)
+
+#summary(coldata_lung$xml_histological_type)
+#Lung Squamous Cell Carcinoma- Not Otherwise Specified (NOS)
+#Lung Adenocarcinoma- Not Otherwise Specified (NOS)
+#Lung Adenocarcinoma Mixed Subtype
+
+B="Lung Adenocarcinoma Mixed Subtype"
+
+A=dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),]
+
+Quant2=rep(NA, dim(dds_tableTOT_lung)[2])
+Quant2[which(A>=quantile(A, na.rm=T, 0.5))]="High"
+#Quant2[which(A<quantile(A, na.rm=T, 0.75))]="Int"
+Quant2[which(A<=quantile(A, na.rm=T, 0.5))]="Low"
+
+mydata=data.frame(time=Suivi_progression[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)],
+                  status=status_recidive[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)])
+
+# List of ggsurvplots
+splots <- list()
+
+fit_recid=survfit(Surv(time,status)~Decile,data=mydata)
+
+splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
+   legend = "bottom", 
+   legend.title = "Lung",
+   legend.labs = c("High", "Low"),
+   palette = c("red4", "green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+
+#2e plot = survie globale
+mydata2=data.frame(time=Suivi_Mort[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)],
+                  status=status_mort[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)],
+                  Decile=Quant2[which(Type_sample!="Solid Tissue Normal"&coldata_lung$xml_histological_type==B)])
+summary(as.factor(mydata$status))
+
+fit_mort=survfit(Surv(time,status)~Decile,data=mydata2)
+
+splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
+   legend = "bottom", 
+   legend.title = "Lung",
+  legend.labs = c("High", "Low"),
+   palette = c("red4","green4"),
+   font.x = c(10),
+   font.y = c(10),
+   main="Survie sans récidive",
+   pval = TRUE,
+              risk.table = TRUE,   surv.median.line=c("v"),
+              tables.y.text = FALSE,
+              ggtheme = theme_classic())
+   
+# Arrange multiple ggsurvplots and print the output
+arrange_ggsurvplots(splots, print = TRUE, title="Lung Adam12 Survie",
+  ncol = 2, nrow = 1, risk.table.height = 0.3)
+```
+
+
+Heatmap
+-----------
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+#Pour le sein
+
+crcsubADAM_TAK1_norm_tot=subADAM_TAK1_norm_tot[,which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC")]
+
+for (i in c(1:dim(crcsubADAM_TAK1_norm_tot)[2])) {
+  crcsubADAM_TAK1_norm_tot[which(crcsubADAM_TAK1_norm_tot[,i]==0),i]=NA
+  crcsubADAM_TAK1_norm_tot[which(crcsubADAM_TAK1_norm_tot[,i]==Inf),i]=NA
+   crcsubADAM_TAK1_norm_tot[which(is.nan(crcsubADAM_TAK1_norm_tot[,i])==T),i]=NA
+}
+
+crcsubADAM_TAK1_norm_tot=na.omit(crcsubADAM_TAK1_norm_tot)
+which((crcsubADAM_TAK1_norm_tot)==0)
+
+Label_col=as.data.frame(as.data.frame(clab_ADAM_tot)$Decile[which(as.data.frame(clab_ADAM_tot)$Tissue=="CRC")])
+head(Label_col)
+colnames(Label_col)="Decile"
+levels(as.factor(Label_col$Decile))
+
+Liste=list(Decile=c("NT"="white", "tumor_high_ADAM"="red4", "tumor_low_ADAM"="green4"))
+
+ha= HeatmapAnnotation(df = Label_col,
+                       col =  Liste,
+                       annotation_legend_param = list(title_gp = gpar(fontsize = 8),
+        labels_gp = gpar(fontsize = 6),grid_height = unit(3, "mm")),
+        annotation_height =unit(0.5, "cm"))
+
+Heatmap(as.matrix(log2(crcsubADAM_TAK1_norm_tot)), 
+   name="expression",
+   cluster_columns = TRUE, 
+    clustering_distance_columns = "euclidean",
+    clustering_method_columns = "ward.D2",
+   column_title = "Lung samples", #titre
+   column_title_gp = gpar(fontsize = 10),
+    km = 3,
+   row_title_gp = gpar(fontsize = c(6,6)),
+    show_column_names = FALSE, #pas de nom des éch
+    show_row_names = FALSE, #ni des gènes
+    top_annotation = ha, #en top, les anno Cancer / NT etc
+   top_annotation_height = unit(0.7, "cm"),
+    show_heatmap_legend = TRUE,
+  col = colorRamp2(c(-10,-2,-1, 0,1,2, 10), c("blue","cyan","black", "black","black","yellow", "orange"))
+    #heatmap_legend_param = list(legend_direction = "vertical",
+    #legend_width = unit(3, "cm"), title_position = "topcenter",fontsize = 6)
+) #on ajoute les anno lignes
+
+```
+Correlation
+-----------
+
+```{r}
+A=dds_tableTOT_CRC[which(rownames(dds_tableTOT_CRC)=="ADAM12"),]
+
+Type=rep("Int", dim(dds_tableTOT_CRC)[2])
+Type[which(A>=quantile(A, na.rm=T, 0.9))]="High"
+Type[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
+Type[which(is.element(clab_CRC$Type, c("Solid Tissue Normal"))==TRUE)]=NA
+Type=as.factor(Type)
+
+
+#on enlève les valeurs normales
+
+Tak1_all=apply(dds_tableTOT_CRC[which(is.element(rownames(dds_tableTOT_CRC), SignatureTAK1$V1)==TRUE),],
+               2,
+               sum)
+
+Adam=dds_tableTOT_CRC[which(rownames(dds_tableTOT_CRC)=="ADAM12"),]
+
+
+#Score TAK1 par colonne
+
+data=data.frame(Tak=Tak1_all,
+           Adam=t(Adam),
+           Type=Type)
+colnames(data)=c("Tak","Adam", "Type")
+head(data)
+
+#Coeff de corrélation
+xm = as.matrix(log2(data[,1:2]+1))
+#head(xm[,])
+library("Hmisc")
+
+M <-  rcorr(xm, type = "pearson")
+M
+library(ggplot2)
+
+ggplot(data=data, aes(x=log2(1+Adam), y=log2(1+Tak), color=Type))+
+  geom_point()+
+  geom_smooth(colour = "black",fill="white", method = "lm") +
+  scale_color_manual(values=c("red4", "black","green4"))+
+  labs(title="Correlation ADAM12 & TAK1 activation \n All Tumors", y="TAK1 activation Score",x="log2(ADAM12 expression)",cex=10)+
+  theme_classic()+ 
+ theme(plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+
+      annotate("text", x = 15.05, y = 23.05, label = equation(M), parse = TRUE)
+```
+
+Boxplot
+--------------------
+```{r}
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("ADAM12"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="ADAM12", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   " ","COAD"," "
+  # "","LUNG",""
+    #"","BREAST",""
+   ))
+
+```
+
+```{r}
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("MAP3K7"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="TAK1", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   " ","COAD"," "
+  # "","LUNG",""
+    #"","BREAST",""
+   ))
+
+
+```
+```{r}
+
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("KAT2A"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="KAT2A", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   " ","COAD"," "
+  # "","LUNG",""
+    #"","BREAST",""
+   ))
+
+```
+```{r}
+ggplot(subADAM_tot[which(is.element(subADAM_tot$Gene,c("SIRT6"))==TRUE),],
+       aes(x=Type, y=log2(values), fill=Decile))+
+	geom_boxplot(position = position_dodge(0.9), notch=TRUE)+
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                size=4, color="black",position = position_dodge(0.9))+
+            geom_hline(yintercept=0, linetype="dashed", color = "grey10")+
+  labs(title="SIRT6", y="log2(FC)",x=" ",cex=10)+
+  theme_classic()+ 
+  theme(plot.title = element_text(size = 14, face = "bold",hjust=0.5),
+              text=element_text(),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 11),
+              axis.text.y=element_text(colour="black", size = 9))+ 
+ scale_fill_manual(values=c("white","red4","green4"))+
+  scale_x_discrete(limits=c(
+   " ","COAD"," "
+  # "","LUNG",""
+    #"","BREAST",""
+   ))
+
+
+```
+TESTS STATS
+----------------------
+en changeant SIRT6 MAP3K7 KAT2A ADAM12
+```{r}
+summary(aov(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "ADAM12"),
+              Type %in% "COAD")))
+```
+```{r}
+#install.packages('PMCMRplus')
+library(PMCMRplus)
+#?tukeyTest
+
+summary(tukeyTest(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "ADAM12"),
+              Type %in% "COAD")))
+```
+
+
+
+
+
+
+
+
