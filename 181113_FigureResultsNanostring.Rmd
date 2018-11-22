@@ -1,5 +1,5 @@
 ---
-title: "Figure Papier Adam12"
+title: "Figure Papier Adam12: Nanostring Global Results"
 output:
   html_document:
     df_print: paged
@@ -18,6 +18,14 @@ output:
 ---
 
 #Introduction
+Ce notebook explique comment générer les figures relatives aux données processées de screen Nanostring. 
+Il fait suite aux analyses d'Oli: se référer à ses notebooks pour comprendre comment les données ont été normalisées.
+
+L'objectif est de réaliser un stripchart mettant en évidance l'induction d'Adam12 par Tak1, et Tak1 seulement, suite au screen Kinases activées. Même graphique pour le screen siRNA. 
+
+Le premier onglet initialise les Pathways (à modifier selon machine), les librairies, les fonctions personnelles et les données. 
+
+Les onglets suivants décrivent la définition des FC, et la construction des graphiques. 
 
 ##Path
 ```{r}
@@ -83,7 +91,8 @@ length(data[,i])) )
 
 => comprendre comment s'organise le bébé. Source : figNanostring.RData
 
-Les deux tableaux sont identiques concernant la structure des lignes.
+Les deux tableaux sont identiques concernant la structure des lignes. Les colonnes contiennent les différents échantillons IMR90. 
+
 ###Index lignes
 ```{r}
 # Probes indexes 
@@ -286,11 +295,7 @@ exprsi= data.frame(exprsi, type = typesi,
 
 head(exprsi)
 ```
-```{r}
-exprsi2=exprsi[order(-rep(log2(1+sd_med_control_si),167)), ]
-sd_med_control_si=sd_med_control_si[order(-sd_med_control_si)]
-head(exprsi2)
-```
+
 
 
 
@@ -308,7 +313,7 @@ head(exprk)
 ```
 
 
-### 2 échelles pour y
+### 2 échelles superposées pour y: FC Ctl et FC Kinases
 
 ```{r}
 # extract data for ggreplel  
@@ -320,7 +325,7 @@ ik[,2] = "TAK1"
 Bar_err_k=rep(sd_med_control_k, 2)
 
 
-#Plot : supperposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
+#Plot : superposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
 # ENfin suppers=pose TAK1 / ADAM12
 
 ggplot( data = exprk, 
@@ -368,7 +373,7 @@ ggplot( data = exprk,
         legend.position="right")
 ```
 
-### Même échelle pour y
+### Même échelle pour y: FC relatif aux ctls
 
 
 ```{r}
@@ -381,7 +386,7 @@ ik[,2] = "TAK1"
 Bar_err_k=rep(sd_med_control_k , 2)
 
 
-#Plot : supperposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
+#Plot : superposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
 # ENfin suppers=pose TAK1 / ADAM12
 
 ggplot( data = exprk, 
