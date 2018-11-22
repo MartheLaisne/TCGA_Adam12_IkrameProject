@@ -41,7 +41,7 @@ library(ggrepel)
 ```
 
 
-##Données
+##DonnÃ©es
 ```{r}
 load(paste(pathData, "figNanostring.RData", sep="/"))
 ```
@@ -71,17 +71,17 @@ length(data[,i])) )
 
 
 
+*-------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
-------------------------------------------------***----------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 
 
 
 
 
-#Exploration données
+#Exploration donnÃ©es
 
-=> comprendre comment s'organise le bébé. Source : figNanostring.RData
+=> comprendre comment s'organise le bÃ©bÃ©. Source : figNanostring.RData
 
 Les deux tableaux sont identiques concernant la structure des lignes.
 ###Index lignes
@@ -112,11 +112,11 @@ allgoi <- c(goi,imp)
 ```{r}
 dim(allNphbptk)
 ```
-C'est un tableau CT en lignes, kinases et controles en colonnes, contenant les valeurs d'expression normalisées. 
+C'est un tableau CT en lignes, kinases et controles en colonnes, contenant les valeurs d'expression normalisÃ©es. 
 
-Cf. Oli pour le choix de la normalisation, j'ai repris les datas à partir desquelles il a représenté les figures V1. 
+Cf. Oli pour le choix de la normalisation, j'ai repris les datas Ã  partir desquelles il a reprÃ©sentÃ© les figures V1. 
 
-NB: ne semble pas être la même normalisation pour les deux set de données (siRNA / kinases).
+NB: ne semble pas Ãªtre la mÃªme normalisation pour les deux set de donnÃ©es (siRNA / kinases).
 
 
 ```{r}
@@ -128,10 +128,10 @@ db <-c(6:11)                                  # Replicated samples
 
 
 ```{r}
-#2 réplicats techniques pour les kinases
+#2 rÃ©plicats techniques pour les kinases
 IMR_R2=apply(allNphbptk[cta, c(2, 3)], 1, mean)
 
-#On choisit les données : on prend la moyenne des deux réplicats techniques, on ne prend pas les sw
+#On choisit les donnÃ©es : on prend la moyenne des deux rÃ©plicats techniques, on ne prend pas les sw
 Expr_nomr_kinase = cbind(IMR_R1=allNphbptk[cta,  1],
                          IMR_R2=IMR_R2,
                          allNphbptk[cta,  c(6:dim(allNphbptk)[2])])
@@ -154,7 +154,7 @@ head(Expr_nomr_kinase)
 dim(allNphbptsi)
 ```
 
-Même genre de tableau, CT en ligne et siRNA en colonnes. 
+MÃªme genre de tableau, CT en ligne et siRNA en colonnes. 
 
 
 ```{r}
@@ -184,7 +184,7 @@ ctposn <- c(ctDNMTn, ctTETn, ctZBTBn, ctUHRF1n, ctPPMD1n)      # siRNA Positive 
 
 
 ```{r}
-#on choisit les données : on ne garde que les CTA
+#on choisit les donnÃ©es : on ne garde que les CTA
 Expr_nomr_si = allNphbptsi[cta, ]
 #View(Expr_nomr_si)
 head(Expr_nomr_si)
@@ -192,17 +192,17 @@ head(Expr_nomr_si)
 
 
 
+*------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
-------------------------------------------------***----------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 
 
 #Statistiques & formatage
 
 =>  On a deux groupes : kinase (resp. si) vs controle. 
-=> Pour chaque groupe, on calcule la médiane ;
-=> Pour chaque groupe, on calcule un FC en divisant par cette médiane ; 
-=> Pour chaque groupe, on calcule la SD associée. 
+=> Pour chaque groupe, on calcule la mÃ©diane ;
+=> Pour chaque groupe, on calcule un FC en divisant par cette mÃ©diane ; 
+=> Pour chaque groupe, on calcule la SD associÃ©e. 
 
 ##Kinases
 ```{r}
@@ -294,8 +294,8 @@ head(exprsi2)
 
 
 
+*------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
-------------------------------------------------***----------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 
 
@@ -308,7 +308,7 @@ head(exprk)
 ```
 
 
-### 2 échelles pour y
+### 2 Ã©chelles pour y
 
 ```{r}
 # extract data for ggreplel  
@@ -316,7 +316,7 @@ ik = subset(exprk, ech == "MAP3K7" & gene == "ADAM12")
 # rename MAP3K7 on TAK1
 ik[,2] = "TAK1" 
 
-#On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
+#On gÃ©nÃ¨re les barres d'erreurs pour les ech controles, n = nb ech ctl
 Bar_err_k=rep(sd_med_control_k, 2)
 
 
@@ -368,7 +368,7 @@ ggplot( data = exprk,
         legend.position="right")
 ```
 
-### Même échelle pour y
+### MÃªme Ã©chelle pour y
 
 
 ```{r}
@@ -377,7 +377,7 @@ ik = subset(exprk, ech == "MAP3K7" & gene == "ADAM12")
 # rename MAP3K7 on TAK1
 ik[,2] = "TAK1" 
 
-#On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
+#On gÃ©nÃ¨re les barres d'erreurs pour les ech controles, n = nb ech ctl
 Bar_err_k=rep(sd_med_control_k , 2)
 
 
@@ -450,13 +450,13 @@ head(exprsi)
 summary(exprsi)
 ```
 
-### 2 échelles pour y
+### 2 Ã©chelles pour y
 
 ```{r}
 # extract data for ggreplel  
 ik = subset(exprsi, (ech %in% c("KAT2A", "SIRT6")) & (gene == "ADAM12"))
 
-#On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
+#On gÃ©nÃ¨re les barres d'erreurs pour les ech controles, n = nb ech ctl
 Bar_err_si=rep(sd_med_control_si, 4)
 
 
@@ -509,13 +509,13 @@ ggplot( data = exprsi,
         legend.position="right")
 ```
 
-### Même échelle pour y
+### MÃªme Ã©chelle pour y
 
 ```{r}
 # extract data for ggreplel  
 ik = subset(exprsi, (ech %in% c("KAT2A", "SIRT6")) & (gene == "ADAM12"))
 
-#On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
+#On gÃ©nÃ¨re les barres d'erreurs pour les ech controles, n = nb ech ctl
 Bar_err_si=rep(log2(sd_med_control_si + 1), 4)
 
 
@@ -570,8 +570,8 @@ ggplot( data = exprsi,
 
 
 
+*------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
-------------------------------------------------***----------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 
 
@@ -585,7 +585,7 @@ ik = subset(exprk, ech == "MAP3K7" & gene == "ADAM12")
 # rename MAP3K7 on TAK1
 ik[,2] = "TAK1" 
 
-#On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
+#On gÃ©nÃ¨re les barres d'erreurs pour les ech controles, n = nb ech ctl
 Bar_err_k2=rep(sd_control_k, 3)
 mean_bar_err_k2=rep(mean_ctlk, 3)
 
@@ -644,7 +644,7 @@ ggplot( data = exprk,
 # extract data for ggreplel  
 ik = subset(exprsi, (ech %in% c("KAT2A", "SIRT6")) & (gene == "ADAM12"))
 
-#On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
+#On gÃ©nÃ¨re les barres d'erreurs pour les ech controles, n = nb ech ctl
 Bar_err_si2=rep(sd_control_si, 4)
 mean_bar_err_si2=rep(mean_ctlsi, 4)
 
@@ -695,8 +695,8 @@ ggplot( data = exprsi,
 
 
 
+*------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
-------------------------------------------------***----------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 #ADAM12 kinases
 
