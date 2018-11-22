@@ -2,7 +2,7 @@
 title: "Ikrame_ADAM12_TAK1"
 output: html_notebook
 ---
-#**Les librairies : **
+#Les librairies : 
 ___________________
 ```{r}
 library(ggplot2)
@@ -18,8 +18,8 @@ library(dendextend)
 library("devtools")
 source_url("https://raw.githubusercontent.com/obigriffith/biostar-tutorials/master/Heatmaps/heatmap.3.R")
 ```
-#**Les données : **
-______________
+#Les donnÃ©es : 
+
 
 ```{r}
 dds_tableTOT_CRC=read.table(file="C:/Users/Mathieu V/Desktop/These_Marthe/Projet_Bioinfo/171220_TCGA_COAD/dds_tableTOT_CRC.txt", header=TRUE, sep="\t")
@@ -42,12 +42,12 @@ rownames(dds_tableTOT_CRC)=make.names(Trad$Symbol, unique=TRUE)
 rownames(dds_tableTOT_lung)=make.names(Trad$Symbol, unique=TRUE)
 rownames(dds_tableTOT_breast)=make.names(Trad$Symbol, unique=TRUE)
 
-#Les premières et dernières lignes contiennent les annotations ENSG et HUGO, on les enlève (pas besoin ici, UGO en rownames)
+#Les premiÃ¨res et derniÃ¨res lignes contiennent les annotations ENSG et HUGO, on les enlÃ¨ve (pas besoin ici, UGO en rownames)
 dds_tableTOT_CRC=dds_tableTOT_CRC[,-c(1,dim(dds_tableTOT_CRC)[2])]
 dds_tableTOT_lung=dds_tableTOT_lung[,-c(1)]
 dds_tableTOT_breast=dds_tableTOT_breast[,-c(1,dim(dds_tableTOT_breast)[2])]
 
-#on isole les tissus normaux et les tumeurs, on veut les premiers et dernier décile d'expression de ADAM12 dans les tumeurs spécifiquement
+#on isole les tissus normaux et les tumeurs, on veut les premiers et dernier dÃ©cile d'expression de ADAM12 dans les tumeurs spÃ©cifiquement
 dds_tissunorm_CRC=dds_tableTOT_CRC[,c(which(as.data.frame(clab_CRC)$Type=="hotpink"))]
 dds_tumor_CRC=dds_tableTOT_CRC[,c(which(as.data.frame(clab_CRC)$Type=="black"))]
 
@@ -60,7 +60,7 @@ dds_tumor_breast=dds_tableTOT_breast[,c(which(clab_breast$Type=="Primary Tumor")
 
 
 
-#on fait un vecteur ADAM avec seulement les valeurs d'expression d'ADAM12; et en titre les échantillons correspondants
+#on fait un vecteur ADAM avec seulement les valeurs d'expression d'ADAM12; et en titre les Ã©chantillons correspondants
 ADAM_NT_CRC=c(as.numeric(dds_tissunorm_CRC[which(rownames(dds_tissunorm_CRC)=="ADAM12"),]))
 names(ADAM_NT_CRC)=colnames(dds_tissunorm_CRC[,])
 ADAM_tumor_CRC=c(as.numeric(dds_tumor_CRC[which(rownames(dds_tumor_CRC)=="ADAM12"),]))
@@ -76,7 +76,7 @@ names(ADAM_NT_breast)=colnames(dds_tissunorm_breast[,])
 ADAM_tumor_breast=c(as.numeric(dds_tumor_breast[which(rownames(dds_tumor_breast)=="ADAM12"),]))
 names(ADAM_tumor_breast)=colnames(dds_tumor_breast[,])
 
-#On prend les noms des échantillons du premier et du dernier décile
+#On prend les noms des Ã©chantillons du premier et du dernier dÃ©cile
 high_ADAM_CRC=names(which(ADAM_tumor_CRC>quantile(ADAM_tumor_CRC,0.9)))
 low_ADAM_CRC=names(which(ADAM_tumor_CRC<=quantile(ADAM_tumor_CRC,0.1)))
 NT_CRC=names(ADAM_NT_CRC)
@@ -344,7 +344,7 @@ New_tumor_event=(coldata_rse_breast$cgc_case_new_tumor_event_after_initial_treat
 head(data.frame(years_to_death, years_to_last_follow_up, New_tumor_event))
 
 
-#survie gloable : le premier évenement est la mort
+#survie gloable : le premier Ã©venement est la mort
 Suivi_Mort=years_to_last_follow_up
 Suivi_Mort[which(is.na(years_to_death)==FALSE)]=years_to_death[which(is.na(years_to_death)==FALSE)]
 
@@ -352,15 +352,15 @@ status_mort=rep(NA, length(years_to_death))
 status_mort[which(is.na(years_to_death)==TRUE)]=0
 status_mort[which(is.na(years_to_death)==FALSE)]=1
 
-#survie sans progression : le premier évenement est la mort ou la rechute
+#survie sans progression : le premier Ã©venement est la mort ou la rechute
 Suivi_progression=years_to_last_follow_up
-#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (généralement c'est exclusif)
+#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (gÃ©nÃ©ralement c'est exclusif)
 Suivi_progression[which(is.na(years_to_last_follow_up)==TRUE)]=years_to_death[which(is.na(years_to_last_follow_up)==TRUE)]
 
 status_recidive=rep(NA, length(New_tumor_event))
 status_recidive[which(is.na(New_tumor_event)==TRUE)]=0
 status_recidive[which(is.na(New_tumor_event)==FALSE)]=1 #on met des 1 si la personne rechute
-status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne récidive
+status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne rÃ©cidive
 
 
 head(cbind(Suivi_progression, status_recidive, Suivi_Mort, status_mort),10)
@@ -397,7 +397,7 @@ splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
    palette = c("red4", "green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive TSP Nat Com",
+   main="Survie sans rÃ©cidive TSP Nat Com",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -418,7 +418,7 @@ splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
    palette = c("red4","green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive TSP Nat Com",
+   main="Survie sans rÃ©cidive TSP Nat Com",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -430,7 +430,7 @@ arrange_ggsurvplots(splots, print = TRUE, title="Breast Adam12 Survie",
 ```
 
 
-#Modèles de Cox
+#ModÃ¨les de Cox
 ```{r}
 A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="ADAM12"),]
 
@@ -439,9 +439,9 @@ ADAM12[which(A>=quantile(A, na.rm=T, 0.9))]="High"
 ADAM12[which(A<quantile(A, na.rm=T, 0.9))]="Int"
 ADAM12[which(A<=quantile(A, na.rm=T, 0.1))]="Low"
 ADAM12=as.factor(ADAM12)
-ADAM12=factor(ADAM12, levels(ADAM12)[c(2,1,3)]) #pour réordonner les niveaux des facteurs
+ADAM12=factor(ADAM12, levels(ADAM12)[c(2,1,3)]) #pour rÃ©ordonner les niveaux des facteurs
 
-#on enlève les valeurs normales
+#on enlÃ¨ve les valeurs normales
 ADAM12[which(Type_sample=="Solid Tissue Normal")]=NA
 
 Age=c(coldata_rse_breast$xml_age_at_initial_pathologic_diagnosis)
@@ -468,7 +468,7 @@ ClassTum[which(clab_breast$PR=="Positive")]="HR"
 ClassTum[which(clab_breast$HER2=="Positive")]="HER2"
 ClassTum[which(clab_breast$HER2=="Equivocal")]=NA
 ClassTum=as.factor(ClassTum)
-ClassTum=factor(ClassTum, levels(ClassTum)[c(1,2,3)]) #pour réordonner les niveaux des facteurs
+ClassTum=factor(ClassTum, levels(ClassTum)[c(1,2,3)]) #pour rÃ©ordonner les niveaux des facteurs
 
 
 mydata=data.frame(time=Suivi_progression[which(Type_sample!="Solid Tissue Normal")],
@@ -498,7 +498,7 @@ print(plot)
 
 
 ```{r}
-#On récupere les labels des échantillons sélectionnés, on ajoute une colonne contenant le groupe ADAM, et une colonne contenant le type de tissu
+#On rÃ©cupere les labels des Ã©chantillons sÃ©lectionnÃ©s, on ajoute une colonne contenant le groupe ADAM, et une colonne contenant le type de tissu
 clab_ADAM_CRC=cbind(clab_CRC[c(c(which(is.element(colnames(dds_tableTOT_CRC), NT_CRC)==TRUE)),
                               c(which(is.element(colnames(dds_tableTOT_CRC), low_ADAM_CRC)==TRUE)),
                     c(which(is.element(colnames(dds_tableTOT_CRC), high_ADAM_CRC)==TRUE))),],
@@ -528,7 +528,7 @@ clab_ADAM_tot=cbind(Decile=c(as.character(clab_ADAM_CRC$Decile),as.character(cla
 ```
 
 ```{r}
-#on construit les subsets de dds_tot avec ces samples là
+#on construit les subsets de dds_tot avec ces samples lÃ 
 ComparADAM_ddsTOT_CRC=dds_tableTOT_CRC[,c(which(is.element(colnames(dds_tableTOT_CRC), NT_CRC)==TRUE),
                                 which(is.element(colnames(dds_tableTOT_CRC), low_ADAM_CRC)==TRUE),
                                 which(is.element(colnames(dds_tableTOT_CRC), high_ADAM_CRC)==TRUE))]
@@ -548,12 +548,12 @@ ComparADAM_ddsTOT_total=cbind(ComparADAM_ddsTOT_CRC,ComparADAM_ddsTOT_lung,Compa
 ```
 
 
-#Activation TAK1 à partir des gènes cibles d'oli*
+#Activation TAK1 Ã  partir des gÃ¨nes cibles d'oli*
 
 
-On veut normaliser les gènes cibles de TAK1 par rapport à leur niveau d'expression basal dans les tissus normaux correspondants
+On veut normaliser les gÃ¨nes cibles de TAK1 par rapport Ã  leur niveau d'expression basal dans les tissus normaux correspondants
 
-Le vecteur contenant le nom des gènes TAK1 est SignatureTAK1
+Le vecteur contenant le nom des gÃ¨nes TAK1 est SignatureTAK1
 
 Construction subset et calcul signatire TAK1
 -----------------
@@ -571,7 +571,7 @@ subADAM_TAK1_c=ComparADAM_ddsTOT_CRC[which(is.element(rownames(ComparADAM_ddsTOT
 
 #####################Calcul des FC
 #on veut calculer un FC tumeur contre tissu normal
-Median_NT_CRC=c()#on calcule la moyenne géometrique (Update Oli) des scores MCP pour les tissus normaux
+Median_NT_CRC=c()#on calcule la moyenne gÃ©ometrique (Update Oli) des scores MCP pour les tissus normaux
 for (i in seq(1,dim(subADAM_TAK1_c)[1])) {
   Median_NT_CRC=c(Median_NT_CRC, median(as.matrix(subADAM_TAK1_c)[i,1:41]))
 }
@@ -649,8 +649,8 @@ Heatmap(as.matrix(log2(breastsubADAM_TAK1_norm_tot)),
    column_title_gp = gpar(fontsize = 10),
     km = 3,
    row_title_gp = gpar(fontsize = c(6,6)),
-    show_column_names = FALSE, #pas de nom des éch
-    show_row_names = FALSE, #ni des gènes
+    show_column_names = FALSE, #pas de nom des Ã©ch
+    show_row_names = FALSE, #ni des gÃ¨nes
     top_annotation = ha, #en top, les anno Cancer / NT etc
    top_annotation_height = unit(0.7, "cm"),
     show_heatmap_legend = TRUE,
@@ -661,7 +661,7 @@ Heatmap(as.matrix(log2(breastsubADAM_TAK1_norm_tot)),
 
 
 ```
-Corrélation
+CorrÃ©lation
 ---------
 ```{r}
 ADAM_TAK1_b=dds_tableTOT_breast[which(is.element(rownames(dds_tableTOT_breast), SignatureTAK1$V1)==TRUE),]
@@ -670,7 +670,7 @@ ADAM_TAK1_c=dds_tableTOT_CRC[which(is.element(rownames(dds_tableTOT_breast), Sig
 
 #####################Calcul des FC
 #on veut calculer un FC tumeur contre tissu normal
-Median_NT_CRC=c()#on calcule la moyenne géometrique (Update Oli) des scores MCP pour les tissus normaux
+Median_NT_CRC=c()#on calcule la moyenne gÃ©ometrique (Update Oli) des scores MCP pour les tissus normaux
 for (i in seq(1,dim(ADAM_TAK1_c)[1])) {
   Median_NT_CRC=c(Median_NT_CRC, median(as.matrix(ADAM_TAK1_c)[i,1:41]))
 }
@@ -743,7 +743,7 @@ equation = function(x) {
 ```
 
 ```{r}
-#Coeff de corrélation
+#Coeff de corrÃ©lation
 xm = as.matrix(data[,1:2])
 #head(xm[,])
 library("Hmisc")
@@ -772,7 +772,7 @@ ggplot(data=data, aes(x=log2(Adam), y=Tak, color=Type))+
 
 
 
-##Corrélation KAT2A /TAK1
+##CorrÃ©lation KAT2A /TAK1
 ```{r}
 A=dds_tableTOT_breast[which(rownames(dds_tableTOT_breast)=="KAT2A"),]
 
@@ -793,7 +793,7 @@ data=data.frame(Tak=Tak1_all,
 colnames(data)=c("Tak","KAT2A", "Type")
 head(data)
 
-#Coeff de corrélation
+#Coeff de corrÃ©lation
 xm = as.matrix(data[,1:2])
 #head(xm[,])
 library("Hmisc")
@@ -847,7 +847,7 @@ data=data.frame(Tak=Tak1_all,
 colnames(data)=c("Tak","SIRT6", "Type")
 head(data)
 
-#Coeff de corrélation
+#Coeff de corrÃ©lation
 xm = as.matrix(data[,1:2])
 #head(xm[,])
 library("Hmisc")
@@ -895,7 +895,7 @@ ggTS_NT=ggplot(data = data, mapping = aes(x = factor(1), y = Num, fill = class))
   geom_bar(width=1, stat = "identity", color="black") +
   coord_polar(theta = "y") + 
   scale_fill_manual(values=c("goldenrod3", "grey70"))+
-  geom_text(aes(x = c(1, 1), #jouer sur ce paramètre pour placer les légendes : distance au centre
+  geom_text(aes(x = c(1, 1), #jouer sur ce paramÃ¨tre pour placer les lÃ©gendes : distance au centre
                 y = Num/2 + c(0, cumsum(Num)[-length(Num)]), 
                 label=paste(Num*100, "%")), family = "Consolas",
             color=c("black", "black"))+
@@ -1033,7 +1033,7 @@ subADAM_table_NT_breast=ComparADAM_ddsTOT_NT_breast[which(is.element(rownames(Co
 
 gene=rownames(subADAM_table_CRC)
 
-#colonne Decile pour nv exp ADAM, gene pour nom des gènes
+#colonne Decile pour nv exp ADAM, gene pour nom des gÃ¨nes
 subADAM_CRC=data.frame(stack(subADAM_table_CRC),
                    Decile=c(rep("NT",length(ADAM_NT_CRC)*length(gene)),
                          rep("tumor_low_ADAM12",length(low_ADAM_CRC)*length(gene)),
@@ -1188,7 +1188,7 @@ summary(tukeyTest(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "ADAM12"
               Type %in% "BREAST")))
 ```
 #Breast TN
-A²12 NT / Tum
+AÂ²12 NT / Tum
 ----------------
 ```{r}
 B=which(ClassTum=="Triple-negative")
@@ -1247,7 +1247,7 @@ splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
    palette = c("red4", "green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive TSP Nat Com",
+   main="Survie sans rÃ©cidive TSP Nat Com",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -1268,7 +1268,7 @@ splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
    palette = c("red4","green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive TSP Nat Com",
+   main="Survie sans rÃ©cidive TSP Nat Com",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -1305,7 +1305,7 @@ splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
    palette = c("red4", "green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive TSP Nat Com",
+   main="Survie sans rÃ©cidive TSP Nat Com",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -1326,7 +1326,7 @@ splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
    palette = c("red4","green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive TSP Nat Com",
+   main="Survie sans rÃ©cidive TSP Nat Com",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -1363,7 +1363,7 @@ splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
    palette = c("red4", "green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive TSP Nat Com",
+   main="Survie sans rÃ©cidive TSP Nat Com",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -1384,7 +1384,7 @@ splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
    palette = c("red4","green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive TSP Nat Com",
+   main="Survie sans rÃ©cidive TSP Nat Com",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -1455,8 +1455,8 @@ Heatmap(as.matrix(log2(subADAM_TAK1_b_TN)),
    column_title_gp = gpar(fontsize = 10),
     km = 3,
    row_title_gp = gpar(fontsize = c(6,6)),
-    show_column_names = FALSE, #pas de nom des éch
-    show_row_names = FALSE, #ni des gènes
+    show_column_names = FALSE, #pas de nom des Ã©ch
+    show_row_names = FALSE, #ni des gÃ¨nes
     top_annotation = ha, #en top, les anno Cancer / NT etc
    top_annotation_height = unit(0.7, "cm"),
     show_heatmap_legend = TRUE,
@@ -1592,7 +1592,7 @@ summary(tukeyTest(ADAM12 ~ Quant2, data))
 
 
 #LUNG
-A²12 NT / Tum
+AÂ²12 NT / Tum
 ----------------
 ```{r}
 coldata_lung=colData(rse_gene)
@@ -1654,7 +1654,7 @@ New_tumor_event=(coldata_lung$cgc_case_new_tumor_event_after_initial_treatment)
 head(data.frame(years_to_death, years_to_last_follow_up, New_tumor_event))
 
 
-#survie gloable : le premier évenement est la mort
+#survie gloable : le premier Ã©venement est la mort
 Suivi_Mort=years_to_last_follow_up
 Suivi_Mort[which(is.na(years_to_death)==FALSE)]=years_to_death[which(is.na(years_to_death)==FALSE)]
 
@@ -1662,15 +1662,15 @@ status_mort=rep(NA, length(years_to_death))
 status_mort[which(is.na(years_to_death)==TRUE)]=0
 status_mort[which(is.na(years_to_death)==FALSE)]=1
 
-#survie sans progression : le premier évenement est la mort ou la rechute
+#survie sans progression : le premier Ã©venement est la mort ou la rechute
 Suivi_progression=years_to_last_follow_up
-#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (généralement c'est exclusif)
+#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (gÃ©nÃ©ralement c'est exclusif)
 Suivi_progression[which(is.na(years_to_last_follow_up)==TRUE)]=years_to_death[which(is.na(years_to_last_follow_up)==TRUE)]
 
 status_recidive=rep(NA, length(New_tumor_event))
 status_recidive[which(is.na(New_tumor_event)==TRUE)]=0
 status_recidive[which(is.na(New_tumor_event)==FALSE)]=1 #on met des 1 si la personne rechute
-status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne récidive
+status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne rÃ©cidive
 
 
 head(cbind(Suivi_progression, status_recidive, Suivi_Mort, status_mort),10)
@@ -1710,7 +1710,7 @@ splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
    palette = c("red4", "green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive",
+   main="Survie sans rÃ©cidive",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -1731,7 +1731,7 @@ splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
    palette = c("red4","green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive",
+   main="Survie sans rÃ©cidive",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -1783,8 +1783,8 @@ Heatmap(as.matrix(log2(lungsubADAM_TAK1_norm_tot)),
    column_title_gp = gpar(fontsize = 10),
     km = 3,
    row_title_gp = gpar(fontsize = c(6,6)),
-    show_column_names = FALSE, #pas de nom des éch
-    show_row_names = FALSE, #ni des gènes
+    show_column_names = FALSE, #pas de nom des Ã©ch
+    show_row_names = FALSE, #ni des gÃ¨nes
     top_annotation = ha, #en top, les anno Cancer / NT etc
    top_annotation_height = unit(0.7, "cm"),
     show_heatmap_legend = TRUE,
@@ -1794,7 +1794,7 @@ Heatmap(as.matrix(log2(lungsubADAM_TAK1_norm_tot)),
 ) #on ajoute les anno lignes
 
 ```
-Corrélation
+CorrÃ©lation
 -----------------
 ```{r}
 A=dds_tableTOT_lung[which(rownames(dds_tableTOT_lung)=="ADAM12"),]
@@ -1806,7 +1806,7 @@ Type[which(is.element(clab_lung$Type, c("Solid Tissue Normal"))==TRUE)]=NA
 Type=as.factor(Type)
 
 
-#on enlève les valeurs normales
+#on enlÃ¨ve les valeurs normales
 
 Tak1_all=apply(dds_tableTOT_lung[which(is.element(rownames(dds_tableTOT_lung), SignatureTAK1$V1)==TRUE),],
                2,
@@ -1823,7 +1823,7 @@ data=data.frame(Tak=Tak1_all,
 colnames(data)=c("Tak","Adam", "Type")
 head(data)
 
-#Coeff de corrélation
+#Coeff de corrÃ©lation
 xm = as.matrix(log2(data[,1:2]+1))
 #head(xm[,])
 library("Hmisc")
@@ -1956,7 +1956,7 @@ summary(tukeyTest(values ~ Decile, subset(subset(subADAM_tot, Gene %in% "MAP3K7"
 ```
 
 #COAD
-A²12 NT / Tum
+AÂ²12 NT / Tum
 ----------------
 ```{r}
 #coldata_lung=colData(rse_gene)
@@ -2019,7 +2019,7 @@ New_tumor_event=(coldata_lung$cgc_case_new_tumor_event_after_initial_treatment)
 head(data.frame(years_to_death, years_to_last_follow_up, New_tumor_event))
 
 
-#survie gloable : le premier évenement est la mort
+#survie gloable : le premier Ã©venement est la mort
 Suivi_Mort=years_to_last_follow_up
 Suivi_Mort[which(is.na(years_to_death)==FALSE)]=years_to_death[which(is.na(years_to_death)==FALSE)]
 
@@ -2027,15 +2027,15 @@ status_mort=rep(NA, length(years_to_death))
 status_mort[which(is.na(years_to_death)==TRUE)]=0
 status_mort[which(is.na(years_to_death)==FALSE)]=1
 
-#survie sans progression : le premier évenement est la mort ou la rechute
+#survie sans progression : le premier Ã©venement est la mort ou la rechute
 Suivi_progression=years_to_last_follow_up
-#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (généralement c'est exclusif)
+#on prend la date du dernier suivi, et si pas d'info on prend la date de la mort (gÃ©nÃ©ralement c'est exclusif)
 Suivi_progression[which(is.na(years_to_last_follow_up)==TRUE)]=years_to_death[which(is.na(years_to_last_follow_up)==TRUE)]
 
 status_recidive=rep(NA, length(New_tumor_event))
 status_recidive[which(is.na(New_tumor_event)==TRUE)]=0
 status_recidive[which(is.na(New_tumor_event)==FALSE)]=1 #on met des 1 si la personne rechute
-status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne récidive
+status_recidive[which(is.na(years_to_death)==FALSE)]=1 #et des 1 si la personne rÃ©cidive
 
 
 head(cbind(Suivi_progression, status_recidive, Suivi_Mort, status_mort),10)
@@ -2075,7 +2075,7 @@ splots[[1]] <- ggsurvplot(fit_recid, data = mydata,
    palette = c("red4", "green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive",
+   main="Survie sans rÃ©cidive",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -2096,7 +2096,7 @@ splots[[2]] <- ggsurvplot(fit_mort, data = mydata2,
    palette = c("red4","green4"),
    font.x = c(10),
    font.y = c(10),
-   main="Survie sans récidive",
+   main="Survie sans rÃ©cidive",
    pval = TRUE,
               risk.table = TRUE,   surv.median.line=c("v"),
               tables.y.text = FALSE,
@@ -2148,8 +2148,8 @@ Heatmap(as.matrix(log2(crcsubADAM_TAK1_norm_tot)),
    column_title_gp = gpar(fontsize = 10),
     km = 3,
    row_title_gp = gpar(fontsize = c(6,6)),
-    show_column_names = FALSE, #pas de nom des éch
-    show_row_names = FALSE, #ni des gènes
+    show_column_names = FALSE, #pas de nom des Ã©ch
+    show_row_names = FALSE, #ni des gÃ¨nes
     top_annotation = ha, #en top, les anno Cancer / NT etc
    top_annotation_height = unit(0.7, "cm"),
     show_heatmap_legend = TRUE,
@@ -2172,7 +2172,7 @@ Type[which(is.element(clab_CRC$Type, c("Solid Tissue Normal"))==TRUE)]=NA
 Type=as.factor(Type)
 
 
-#on enlève les valeurs normales
+#on enlÃ¨ve les valeurs normales
 
 Tak1_all=apply(dds_tableTOT_CRC[which(is.element(rownames(dds_tableTOT_CRC), SignatureTAK1$V1)==TRUE),],
                2,
@@ -2189,7 +2189,7 @@ data=data.frame(Tak=Tak1_all,
 colnames(data)=c("Tak","Adam", "Type")
 head(data)
 
-#Coeff de corrélation
+#Coeff de corrÃ©lation
 xm = as.matrix(log2(data[,1:2]+1))
 #head(xm[,])
 library("Hmisc")
