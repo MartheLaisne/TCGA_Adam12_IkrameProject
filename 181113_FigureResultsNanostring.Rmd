@@ -1,31 +1,23 @@
 ---
-title: "Figure Papier Adam12: Nanostring Global Results"
+title: "Figure Papier Adam12"
 output:
   html_document:
     df_print: paged
     toc: yes
-    toc_depth: '3'
+    toc_depth: '4'
   html_notebook:
     number_sections: yes
     toc: yes
-    toc_depth: 3
+    toc_depth: 4
     toc_float:
       collapsed: no
       smooth_scroll: yes
   pdf_document:
     toc: yes
-    toc_depth: '3'
+    toc_depth: '4'
 ---
 
 #Introduction
-Ce notebook explique comment générer les figures relatives aux données processées de screen Nanostring. 
-Il fait suite aux analyses d'Oli: se référer à ses notebooks pour comprendre comment les données ont été normalisées.
-
-L'objectif est de réaliser un stripchart mettant en évidance l'induction d'Adam12 par Tak1, et Tak1 seulement, suite au screen Kinases activées. Même graphique pour le screen siRNA. 
-
-Le premier onglet initialise les Pathways (à modifier selon machine), les librairies, les fonctions personnelles et les données. 
-
-Les onglets suivants décrivent la définition des FC, et la construction des graphiques. 
 
 ##Path
 ```{r}
@@ -73,6 +65,18 @@ length(data[,i])) )
          return( dt )
 }
 
+Ma_function_mean = function(X) {
+  mean(X, na.rm=T)
+}
+Ma_function_median = function(X) {
+  median(X, na.rm=T)
+}
+
+
+Ma_function_sd = function(X) {
+  sd(X, na.rm=T)
+}
+
 
 ```
 
@@ -91,8 +95,7 @@ length(data[,i])) )
 
 => comprendre comment s'organise le bébé. Source : figNanostring.RData
 
-Les deux tableaux sont identiques concernant la structure des lignes. Les colonnes contiennent les différents échantillons IMR90. 
-
+Les deux tableaux sont identiques concernant la structure des lignes.
 ###Index lignes
 ```{r}
 # Probes indexes 
@@ -201,7 +204,7 @@ head(Expr_nomr_si)
 
 
 
-------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 
@@ -215,61 +218,154 @@ head(Expr_nomr_si)
 
 ##Kinases
 ```{r}
+#A cause du log, attention aux zeros
+Expr_nomr_kinase2 = Expr_nomr_kinase
+Expr_nomr_kinase2[Expr_nomr_kinase2 == 0] <- NA
 ## Compute median expression of all and negative controls
 
-medk = apply(Expr_nomr_kinase[,], 1, median )
-med_ctlk = apply(Expr_nomr_kinase[,ctnegk], 1, median )
-mean_ctlk = apply(Expr_nomr_kinase[,ctnegk], 1, mean )
+medk = apply(Expr_nomr_kinase2[,], 1, Ma_function_median )
+med_ctlk = apply(Expr_nomr_kinase2[,ctnegk], 1, Ma_function_median )
 
-sdk = apply(Expr_nomr_kinase[,], 1, sd )
-sd_control_k = apply(Expr_nomr_kinase[,ctnegk], 1, sd )
+sdk = apply(Expr_nomr_kinase2[,], 1, Ma_function_sd )
+sd_control_k = apply(Expr_nomr_kinase2[,ctnegk], 1, Ma_function_sd )
 
-sd_med_k = apply(log2(Expr_nomr_kinase[,]/medk), 1, sd )
-sd_med_control_k = apply(log2(Expr_nomr_kinase[,ctnegk]/med_ctlk), 1, sd )
+sd_med_k = apply(Expr_nomr_kinase2[,]/medk, 1, Ma_function_sd )
+sd_med_control_k = apply(Expr_nomr_kinase2[,ctnegk]/med_ctlk, 1, Ma_function_sd )
 
 
 ## Vectorize normalized counts, fold change over geomean and fold change over median
-exprk = vecto(Expr_nomr_kinase[,])
-fcmexprk = vecto(log2(Expr_nomr_kinase[,]/medk))
+exprk = vecto(Expr_nomr_kinase2[,])
+fcmexprk = vecto(Expr_nomr_kinase2[,]/medk) #Data en log2
 
-fcmexpr_ctlk = vecto(log2(Expr_nomr_kinase[,]/med_ctlk))
+fcmexpr_ctlk = vecto(Expr_nomr_kinase2[,]/med_ctlk)
 
 ## create an annotation vector sample type
-typek = c( rep("Untransfected",2*dim(Expr_nomr_kinase)[1]) ,
-           rep("Kinases", 191*dim(Expr_nomr_kinase)[1]))
+typek = c( rep("Untransfected",2*dim(Expr_nomr_kinase2)[1]) ,
+           rep("Kinases", 191*dim(Expr_nomr_kinase2)[1]))
 
 ## Combine all informations in one dataframe
 
 exprk = data.frame(exprk, type = typek, 
-                   fcmed = fcmexprk$vec, fcmexpr_ctl=fcmexpr_ctlk$vec,
-                   sd =sdk, sd_control = sd_control_k, 
-                   sd_med = sd_med_k , sd_med_control = sd_med_control_k)
+                   fcmed = log2(fcmexprk$vec), fcmexpr_ctl=log2(fcmexpr_ctlk$vec),
+                   sd = log2(sdk), sd_control = log2(sd_control_k), 
+                   sd_med = log2(sd_med_k) , sd_med_control = log2(sd_med_control_k))
 
 
 head(exprk)
 ```
 
+###Seuil Oli
+
+####Test Norm
+
+
+On teste la normalité des ditributions
+
+```{r}
+Test_norm = apply(log2(Expr_nomr_kinase2), 1, shapiro.test )
+
+Compteur = 0 #compte les distributions normales (42 gènes)
+Names_Non_norm = NULL
+
+for (i in seq(1, length(Test_norm))) {
+  if (Test_norm[[i]]$p.value<0.05) {
+    print(Test_norm[i])
+    Names_Non_norm = c(Names_Non_norm, names(Test_norm[i]))
+  } else {
+    Compteur = Compteur +1
+  }
+}
+
+Compteur
+Names_Non_norm
+```
+==> Les FC suivent une loi normale
+==> On a quand même des distributions non normales... 
+
+
+#### Threshold
+
+```{r}
+#A cause du log, attention aux zeros
+Expr_nomr_kinase2 = Expr_nomr_kinase
+Expr_nomr_kinase2[Expr_nomr_kinase2 == 0] <- NA
+
+#On calcule mean, sd et qnorm(0.99)
+mean_k = apply(log2(Expr_nomr_kinase2[,]), 1, Ma_function_mean )
+
+sd_FC_k = apply(log2(Expr_nomr_kinase2[,]), 1, Ma_function_sd )
+
+qnorm_k = qnorm(0.99, lower.tail = T) * sd_FC_k # 99.7 % de taux d'erreur est eq à 3*SD
+qnorm_k_plus = qnorm(0.9999, lower.tail = T) * sd_FC_k
+
+#Pour mettre le thr à la même échelle que les log FC, on le divise par la médiane
+#et on prend le log du résultat
+thr_k = log2(2^(mean_k + qnorm_k)/medk)
+thr_k_plus = log2(2^(mean_k + qnorm_k_plus)/medk)
+
+#Pour ADAM12
+thr_A12 = 2^(mean_k[names(mean_k) == "ADAM12"] + qnorm_k[names(qnorm_k)=="ADAM12"])
+thr_A12_plus = 2^(mean_k[names(mean_k) == "ADAM12"] + qnorm_k_plus[names(qnorm_k_plus)=="ADAM12"])
+
+#on ajoute cette info au tableau
+exprk = data.frame(exprk, 
+                   thr = rep(thr_k, 193 ),
+                   thr_plus = rep(thr_k_plus, 193))
+head(exprk)
+```
+
+Quelles sont les kinases au dessus du threshold ? 
+```{r}
+exprk[which(exprk$fcmed > exprk$thr), c("gene","ech","fcmed",  "thr", "thr_plus")]
+```
+
+```{r}
+exprk[which(exprk$fcmed > exprk$thr_plus), c("gene","ech","fcmed",  "thr", "thr_plus")]
+
+```
+
+
+```{r}
+paste("Ce gène n'a pas une distribution normale et est induit:",
+      Names_Non_norm[which(is.element(Names_Non_norm, 
+                                      exprk[which(exprk$fcmed > exprk$thr), 
+                                            c("gene","ech","fcmed",  "thr")]$gene)==TRUE)])
+
+
+paste("Ce gène n'a pas une distribution normale mais n'est pas induit:",
+      Names_Non_norm[which(is.element(Names_Non_norm, 
+                                      exprk[which(exprk$fcmed > exprk$thr), 
+                                            c("gene","ech","fcmed",  "thr")]$gene)==FALSE)])
+```
+
+
+
+
+
+
 ##siRNA
 
 ```{r}
+Expr_nomr_si2 = Expr_nomr_si
+Expr_nomr_si2[Expr_nomr_si2 == 0] <- NA
+
 ## Computemedian expression of samples (resp. negative controls)
 
-medsi = apply(Expr_nomr_si[cta,], 1, median )
-med_ctlsi = apply(Expr_nomr_si[cta,ctnegsin], 1, median )
-mean_ctlsi = apply(Expr_nomr_si[cta,ctnegsin], 1, mean )
+medsi = apply(Expr_nomr_si2[cta,], 1, Ma_function_median )
+med_ctlsi = apply(Expr_nomr_si2[cta,ctnegsin], 1, Ma_function_median )
 
-sdsi = apply(Expr_nomr_si[cta,], 1, sd )
-sd_control_si = apply(Expr_nomr_si[cta,ctnegsin], 1, sd )
+sdsi = apply(Expr_nomr_si2[cta,], 1, Ma_function_sd )
+sd_control_si = apply(Expr_nomr_si2[cta,ctnegsin], 1, Ma_function_sd )
 
-sd_med_si = apply(log2(Expr_nomr_si[cta,]/medsi), 1, sd )
-sd_med_control_si = apply(log2(Expr_nomr_si[cta,ctnegsin]/med_ctlsi), 1, sd )
+sd_med_si = apply(Expr_nomr_si2[cta,]/medsi, 1, Ma_function_sd )
+sd_med_control_si = apply(Expr_nomr_si2[cta,ctnegsin]/med_ctlsi, 1, Ma_function_sd )
 
 
 ## Vectorize normalized counts, fold change over geomean and fold change over median
 exprsi = vecto(Expr_nomr_si[cta,])
-fcmexprsi = vecto(log2(Expr_nomr_si[cta,]/medsi))
+fcmexprsi = vecto((Expr_nomr_si[cta,]/medsi))
 
-fcmexpr_ctlsi = vecto(log2(Expr_nomr_si[cta,]/med_ctlsi))
+fcmexpr_ctlsi = vecto((Expr_nomr_si[cta,]/med_ctlsi))
 
 ## create an annotation vector sample type
 
@@ -288,18 +384,83 @@ sict = c( rep("sictrlneg", 4*nrow(Expr_nomr_si[cta,])),
 ## Combine all informations in one dataframe
 
 exprsi= data.frame(exprsi, type = typesi, 
-                  fcmed = fcmexprsi$vec, fcmexpr_ctl=fcmexpr_ctlsi$vec,
-                   sd =sdsi, sd_control=sd_control_si, 
-                  sd_med = sd_med_si, sd_med_control = sd_med_control_si)
+                  fcmed = log2(fcmexprsi$vec), fcmexpr_ctl = log2(fcmexpr_ctlsi$vec),
+                   sd = log2(sdsi), sd_control= log2(sd_control_si), 
+                  sd_med = log2(sd_med_si), sd_med_control = log2(sd_med_control_si))
 
 
 head(exprsi)
 ```
 
+###Seuil Oli
+
+####Test Norm 
+```{r}
+Test_norm = apply(log2(Expr_nomr_si2), 1, shapiro.test )
+
+Compteur = 0 #compte les distributions normales (42 gènes)
+Names_Non_norm = NULL
+
+for (i in seq(1, length(Test_norm))) {
+  if (Test_norm[[i]]$p.value<0.05) {
+    print(Test_norm[i])
+    Names_Non_norm = c(Names_Non_norm, names(Test_norm[i]))
+  } else {
+    Compteur = Compteur +1
+  }
+}
+
+Compteur
+Names_Non_norm
+```
+
+####Thr
+
+```{r}
+
+#A cause du log, attention aux zeros
+Expr_nomr_si2 = Expr_nomr_si
+Expr_nomr_si2[Expr_nomr_si2 == 0] <- NA
+
+#On calcule mean, sd et qnorm(0.99)
+mean_si = apply(log2(Expr_nomr_si2[,]), 1, Ma_function_mean )
+
+sd_FC_si = apply(log2(Expr_nomr_si2[,]), 1, Ma_function_sd )
+
+qnorm_si = qnorm(0.99, lower.tail = T) * sd_FC_si
+qnorm_si_plus = qnorm(0.9999, lower.tail = T) * sd_FC_si
+
+thr_si = log2(2^(mean_si + qnorm_si)/medsi)
+thr_si_plus = log2(2^(mean_si + qnorm_si_plus)/medsi)
+
+#Pour ADAM12
+thr_A12_si = 2^(mean_si[names(mean_si) == "ADAM12"] + qnorm_si[names(qnorm_si)=="ADAM12"])
+thr_A12_si_plus = 2^(mean_si[names(mean_si) == "ADAM12"] +
+                       qnorm_si_plus[names(qnorm_si_plus)=="ADAM12"])
+
+
+#On ajoute cette information au tableau
+exprsi = data.frame(exprsi,
+                    thr = rep(thr_si, 167),
+                    thr_plus = rep(thr_si_plus, 167))
+head(exprsi)
+```
+
+Quels sont les si au dessus du thr ? 
+```{r}
+exprsi[which(exprsi$fcmed > exprsi$thr), c("gene","ech","fcmed",  "thr", "thr_plus")]
+
+```
+```{r}
+exprsi[which(exprsi$fcmed > exprsi$thr_plus), c("gene","ech","fcmed",  "thr", "thr_plus")]
+
+```
 
 
 
-------------------------------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 
@@ -313,7 +474,7 @@ head(exprk)
 ```
 
 
-### 2 échelles superposées pour y: FC Ctl et FC Kinases
+###Compare Controls
 
 ```{r}
 # extract data for ggreplel  
@@ -324,8 +485,7 @@ ik[,2] = "TAK1"
 #On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
 Bar_err_k=rep(sd_med_control_k, 2)
 
-
-#Plot : superposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
+#Plot : supperposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
 # ENfin suppers=pose TAK1 / ADAM12
 
 ggplot( data = exprk, 
@@ -373,7 +533,13 @@ ggplot( data = exprk,
         legend.position="right")
 ```
 
-### Même échelle pour y: FC relatif aux ctls
+```{r}
+
+```
+
+
+
+### Compare distribution, thr 1%
 
 
 ```{r}
@@ -382,45 +548,97 @@ ik = subset(exprk, ech == "MAP3K7" & gene == "ADAM12")
 # rename MAP3K7 on TAK1
 ik[,2] = "TAK1" 
 
-#On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
-Bar_err_k=rep(sd_med_control_k , 2)
+Bar_err_k = exprk$thr
 
 
-#Plot : superposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
+#Plot : supperposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
 # ENfin suppers=pose TAK1 / ADAM12
 
 ggplot( data = exprk, 
               aes(x = gene , 
-                  y = fcmexpr_ctl, color = type))  +
-          scale_color_manual(values=c( "black", "orange", "grey"))+
+                  y = fcmed, color = type))  +
+          scale_color_manual(values=c( "black", "orange", "black"))+
   
-          geom_hline(aes(yintercept=0),   
-               color="black", linetype="solid", size=0.5)+
+          geom_hline(aes(yintercept=0), color="black", linetype="solid", size=0.5)+
   
-          geom_point(data  = subset(exprk, type %in% c("Kinases")),
-              aes(x = gene , 
-                  y = fcmexpr_ctl,
-                  color="Kinases")) +
+          geom_jitter(data  = subset(exprk, (type %in% c("Kinases")) & (fcmed < thr)),
+              aes(x = gene , y = fcmed, color="Kinases"), size=3, shape=19, width = 0.2) +
+          geom_point(data  = subset(exprk, (type %in% c("Kinases"))  & (fcmed > thr) ),
+              aes(x = gene , y = fcmed, color="Kinases"), size=3, shape=19) +
 
-          geom_point( data  = subset(exprk, type %in% c("Untransfected")), 
-                       aes(x = gene, 
-                           y = fcmexpr_ctl,
-                           color="Controls")) +
-          geom_errorbar(data  = subset(exprk, type %in% c("Untransfected")),
-                        aes(ymin=-Bar_err_k, 
-                            ymax=Bar_err_k, colour="black", width=1)) +
-  
+         geom_point( data  = subset(exprk, type %in% c("Untransfected")), aes(x = gene,  y = fcmed,
+                           color="Controls"), size=3, shape=19) +
+          
+         geom_errorbar(aes(ymin= 0, 
+                            ymax=Bar_err_k, color = "Threshold 1%"), width=1, size=1) +
+         
           geom_point(data = subset(exprk , (ech == "MAP3K7") & (gene == "ADAM12")), 
-                      aes( shape = "TAK1 on ADAM12" ), color = "red ",  size = 2)+
-          geom_text_repel(data = ik,   
-                          aes(x= gene, y = fcmexpr_ctl , label = ech), 
-                           color="red", size = 4, max.iter = 5000, 
-                          box.padding=0, segment.alpha=0,   
-                          direction="y", nudge_y = 10 )+    #bouger verticalement
+                      aes( shape = "TAK1 on ADAM12" ), color = "red ", size=3, shape=19)+
+          geom_text_repel(data = ik, aes(x= gene, y = fcmed , label = ech),  color="red", size = 4,
+                          max.iter = 5000, box.padding=0, segment.alpha=0, direction="y", 
+                          nudge_y = 1)+    #bouger verticalement
   
-          scale_x_discrete(limits=names(sd_med_control_k[order(-sd_med_control_k)]))+
-     #     scale_y_continuous(limits=c(-1, 4)) +
-          labs(shape = "Kinase", color = "Samples", #Renommenr les labels, titres et axes
+          scale_x_discrete(limits=names(thr_k[order(-thr_k)]))+
+          scale_y_continuous(limits=c(-5, 5)) +
+
+            labs(shape = "Kinase", color = "Samples", #Renommenr les labels, titres et axes
+               title="Nanostring Screen Kinases \n TS/PS in IMR90",
+               y="Log2 Fold Change (Median) ",
+               x="TS/PS targeted")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 12, face = "bold",hjust = 0.5),         #Mise en page
+              text=element_text(),
+              axis.title = element_text(face="bold", size=10),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 6),
+              axis.text.y=element_text(colour="black", size = 6),
+        legend.text = element_text(size=8),
+        legend.position="right")
+
+```
+
+
+###Compare distrib, thr 0.3%
+```{r}
+# extract data for ggreplel  
+ik = subset(exprk, ech == "MAP3K7" & gene == "ADAM12")
+# rename MAP3K7 on TAK1
+ik[,2] = "TAK1" 
+
+Bar_err_k = exprk$thr
+Bar_err_k_plus = exprk$thr_plus
+
+
+#Plot : supperposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
+# ENfin suppers=pose TAK1 / ADAM12
+
+ggplot( data = exprk, 
+              aes(x = gene , 
+                  y = fcmed, color = type))  +
+          scale_color_manual(values=c( "black", "orange", "black", "black"))+
+  
+          geom_hline(aes(yintercept=0), color="black", linetype="solid", size=0.5)+
+  
+          geom_point(data  = subset(exprk, (type %in% c("Kinases")) & (fcmed < thr_k_plus)),
+              aes(x = gene , y = fcmed, color="Kinases"), size=2, shape=19) +
+         geom_point(data  = subset(exprk, (type %in% c("Kinases"))  & (fcmed > thr_k_plus) ),
+              aes(x = gene , y = fcmed, color="Kinases"), size=3, shape=19) +
+
+          geom_point( data  = subset(exprk, type %in% c("Untransfected")), aes(x = gene,  y = fcmed,
+                           color="Controls"), size=3, shape=19) +
+          
+        geom_errorbar(aes(ymin= 0,ymax=Bar_err_k, color = "Threshold 1%"), width=1, size=0.2) +
+        geom_errorbar(aes(ymin= 0,ymax=Bar_err_k_plus, color = "Threshold 0.01%"), width=1, size=1) +
+         
+          geom_point(data = subset(exprk , (ech == "MAP3K7") & (gene == "ADAM12")), 
+                      aes( shape = "TAK1 on ADAM12" ), color = "red ", size=3, shape=19)+
+          geom_text_repel(data = ik, aes(x= gene, y = fcmed , label = ech),  color="red", size = 4,
+                          max.iter = 5000, box.padding=0, segment.alpha=0, direction="y", 
+                          nudge_y = 1)+    #bouger verticalement
+  
+          scale_x_discrete(limits=names(thr_k[order(-thr_k)]))+
+          scale_y_continuous(limits=c(-5, 5)) +
+
+            labs(shape = "Kinase", color = "Samples", #Renommenr les labels, titres et axes
                title="Nanostring Screen Kinases \n TS/PS in IMR90",
                y="Log2 Fold Change (Median) ",
                x="TS/PS targeted")+
@@ -433,8 +651,6 @@ ggplot( data = exprk,
         legend.text = element_text(size=8),
         legend.position="right")
 ```
-
-
 
 
 
@@ -455,7 +671,7 @@ head(exprsi)
 summary(exprsi)
 ```
 
-### 2 échelles pour y
+### Compare Ctl
 
 ```{r}
 # extract data for ggreplel  
@@ -514,51 +730,51 @@ ggplot( data = exprsi,
         legend.position="right")
 ```
 
-### Même échelle pour y
+### Compare Distribution thr 1%
 
 ```{r}
 # extract data for ggreplel  
 ik = subset(exprsi, (ech %in% c("KAT2A", "SIRT6")) & (gene == "ADAM12"))
 
 #On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
-Bar_err_si=rep(log2(sd_med_control_si + 1), 4)
+Bar_err_si=exprsi$thr
 
 
 #Plot : supperposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
 # ENfin suppers=pose SIRT6 KAT2A / ADAM12
 
-ggplot( data = exprsi, 
+ggplot(data = exprsi, 
               aes(x = gene , 
-                  y = log2(fcmexpr_ctl + 1), color = type))  +
-          scale_color_manual(values=c( "black", "orange"))+
+                  y = fcmed, color = type))  +
+          scale_color_manual(values=c( "black","orange", "black"))+
   
-          geom_hline(aes(yintercept=1),   
+          geom_hline(aes(yintercept=0),   
                color="black", linetype="solid", size=0.5)+
   
-          geom_point(data  = subset(exprsi, type %in% c("siRNA")),
-              aes(x = gene , 
-                  y = log2(fcmexpr_ctl + 1),
-                  color="siRNA")) +
+          geom_jitter(data  = subset(exprsi, (type %in% c("siRNA")) & (fcmed < thr)),
+              aes(x = gene , y = fcmed, color="siRNA"), size=3, shape=19, width = 0.1) +
+         geom_point(data  = subset(exprsi, (type %in% c("siRNA"))  & (fcmed > thr) ),
+              aes(x = gene , y = fcmed, color="siRNA"), size=3, shape=19) +
 
           geom_point( data  = subset(exprsi, type %in% c("siCtrl")), 
-                       aes(x = gene, 
-                           y = log2(fcmexpr_ctl+ 1),
-                           color="siCtrl")) +
-          geom_errorbar(data  = subset(exprsi, type %in% c("siCtrl")),
-                        aes(ymin=1-Bar_err_si, 
-                            ymax=1+Bar_err_si), colour="black", width=1) +
+                       aes(x = gene,  y = fcmed, color="siCtrl"), size = 3, shape = 19) +
+          
+  geom_errorbar(data = exprsi, 
+                        aes(ymin=0, 
+                            ymax=Bar_err_si, color = "Threshold 1%"), width=1, size = 1)  +
   
           geom_point(data = subset(exprsi , (ech  %in% c("KAT2A", "SIRT6")) & (gene == "ADAM12")), 
-                      aes( shape = "SIRT6 / KAT2A \n on ADAM12" ), color = "red ",  size = 2)+
-          geom_text_repel(data = ik,   
-                          aes(x= gene, y = log2(fcmexpr_ctl + 1) , label = ech), 
+                      aes( shape = "SIRT6 / KAT2A \n on ADAM12" ), color = "red ",  size = 3, shape = 19)+
+   geom_text_repel(data = ik,   
+                          aes(x= gene, y = fcmed , label = ech), 
                           #arrow = arrow(length = unit(0.03, "npc"), type = "closed", ends = "first"),
                           color="red", size = 4, max.iter = 5000,  force = 10,
                           box.padding=0, segment.alpha=1, segment.size=0.2,  
-                          direction="both", nudge_y =0.8, nudge_x= c(2.5,0) )+    #bouger verticalement
-  
-          scale_x_discrete(limits=names(sd_med_control_si[order(-sd_med_control_si)]))+
-          scale_y_continuous(limits=c(-1, 4)) +
+                          direction="both", nudge_y =1.5, nudge_x= c(2.5,0) )+    #bouger verticalement
+
+
+          scale_x_discrete(limits=names(thr_si[order(-thr_si)]))+
+          scale_y_continuous(limits=c(-5, 5)) +
           labs(shape = "siRNA", color = "Samples", #Renommenr les labels, titres et axes
                title="Nanostring Screen Epigenetic \n TS/PS in IMR90",
                y="Log2 Fold Change (Median) ",
@@ -573,117 +789,50 @@ ggplot( data = exprsi,
         legend.position="right")
 ```
 
-
-
-------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------
-
-
-#Stripchart SD Norm Count
-
-##Kinase
-
-```{r}
-# extract data for ggreplel  
-ik = subset(exprk, ech == "MAP3K7" & gene == "ADAM12")
-# rename MAP3K7 on TAK1
-ik[,2] = "TAK1" 
-
-#On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
-Bar_err_k2=rep(sd_control_k, 3)
-mean_bar_err_k2=rep(mean_ctlk, 3)
-
-#Plot : supperposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
-# ENfin suppers=pose TAK1 / ADAM12
-
-ggplot( data = exprk, 
-              aes(x = gene , 
-                  y = vec , color = type))  +
-          scale_color_manual(values=c( "black", "orange"))+
-  
-          geom_hline(aes(yintercept=1),   
-               color="black", linetype="solid", size=0.5)+
-  
-          geom_point(data  = subset(exprk, type %in% c("Kinases")),
-              aes(x = gene , 
-                  y =vec,
-                  color="Kinases")) +
-
-          geom_point( data  = subset(exprk, type %in% c("Controls")), 
-                       aes(x = gene, 
-                           y = vec,
-                           color="Controls")) +
-          geom_errorbar(data  = subset(exprk, type %in% c("Controls")),
-                        aes(ymin=mean_bar_err_k2 -Bar_err_k2, 
-                            ymax=mean_bar_err_k2 +Bar_err_k2), colour="black", width=1) +
-  
-          geom_point(data = subset(exprk , (ech == "MAP3K7") & (gene == "ADAM12")), 
-                      aes( shape = "TAK1 on ADAM12" ), color = "red ",  size = 2)+
-          geom_text_repel(data = ik,   
-                          aes(x= gene, y = log2(vec + 1) , label = ech), 
-                           color="red", size = 4, max.iter = 5000, 
-                          box.padding=0, segment.alpha=0,   
-                          direction="y", nudge_y = 600 )+    #bouger verticalement
-  
-          scale_x_discrete(limits=names(sd_control_k[order(-sd_control_k)]))+
-        #  scale_y_continuous(limits=c(-1, 4)) +
-          labs(shape = "Kinase", color = "Samples", #Renommenr les labels, titres et axes
-               title="Nanostring Screen Kinases \n TS/PS in IMR90",
-               y="Log2 Norm Expression",
-               x="TS/PS targeted")+
-  theme_classic()+
-  theme(plot.title = element_text(size = 12, face = "bold",hjust = 0.5),         #Mise en page
-              text=element_text(),
-              axis.title = element_text(face="bold", size=10),
-              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 6),
-              axis.text.y=element_text(colour="black", size = 6),
-        legend.text = element_text(size=8),
-        legend.position="right")
-```
-
-
-
-##siRNA
+###Compare distribution thr 0.3 % 
 ```{r}
 # extract data for ggreplel  
 ik = subset(exprsi, (ech %in% c("KAT2A", "SIRT6")) & (gene == "ADAM12"))
 
 #On génère les barres d'erreurs pour les ech controles, n = nb ech ctl
-Bar_err_si2=rep(sd_control_si, 4)
-mean_bar_err_si2=rep(mean_ctlsi, 4)
+Bar_err_si=exprsi$thr
+Bar_err_si_plus=exprsi$thr_plus
+
 
 #Plot : supperposition de samples kinases (orange) et samples ctl (noir) + Barre d'erreurs (SD), 
 # ENfin suppers=pose SIRT6 KAT2A / ADAM12
 
-ggplot( data = exprsi, 
+ggplot(data = exprsi, 
               aes(x = gene , 
-                  y = vec, color = type))  +
-          scale_color_manual(values=c( "black", "orange"))+
+                  y = fcmed, color = type))  +
+          scale_color_manual(values=c( "black","orange", "black", "black"))+
   
-          geom_hline(aes(yintercept=1),   
+          geom_hline(aes(yintercept=0),   
                color="black", linetype="solid", size=0.5)+
   
-          geom_point(data  = subset(exprsi, type %in% c("siRNA")),
-              aes( color="siRNA")) +
+          geom_point(data  = subset(exprsi, (type %in% c("siRNA")) & (fcmed < thr_plus)),
+              aes(x = gene , y = fcmed, color="siRNA"), size=2, shape=19) +
+         geom_point(data  = subset(exprsi, (type %in% c("siRNA"))  & (fcmed > thr_plus) ),
+              aes(x = gene , y = fcmed, color="siRNA"), size=3, shape=19) +
 
           geom_point( data  = subset(exprsi, type %in% c("siCtrl")), 
-                       aes(color="siCtrl")) +
-          geom_errorbar(data  = subset(exprsi, type %in% c("siCtrl")),
-                        aes(ymin=mean_bar_err_si2-Bar_err_si2, 
-                            ymax=mean_bar_err_si2 +Bar_err_si2), colour="black", width=1) +
+                       aes(x = gene,  y = fcmed, color="siCtrl"), size = 3, shape = 19) +
+          
+  geom_errorbar(aes(ymin=0,ymax=Bar_err_si, color = "Threshold 1%"), width=1, size = 0.2)  +
+  geom_errorbar(aes(ymin=0,ymax=Bar_err_si_plus, color = "Threshold 0.01%"), width=1, size = 1)  +
   
           geom_point(data = subset(exprsi , (ech  %in% c("KAT2A", "SIRT6")) & (gene == "ADAM12")), 
-                      aes( shape = "SIRT6 / KAT2A \n on ADAM12" ), color = "red ",  size = 2)+
-          geom_text_repel(data = ik,   
-                          aes(x= gene, y =vec , label = ech), 
+                      aes( shape = "SIRT6 / KAT2A \n on ADAM12" ), color = "red ",  size = 3, shape = 19)+
+   geom_text_repel(data = ik,   
+                          aes(x= gene, y = fcmed , label = ech), 
                           #arrow = arrow(length = unit(0.03, "npc"), type = "closed", ends = "first"),
-                          color="red", size = 3, max.iter = 5000,  force = 10,
+                          color="red", size = 4, max.iter = 5000,  force = 10,
                           box.padding=0, segment.alpha=1, segment.size=0.2,  
-                          direction="both", nudge_y =0.8, nudge_x= c(2.5,0) )+    #bouger verticalement
-  
-          scale_x_discrete(limits=names(sd_control_si[order(-sd_control_si)]))+
-  #        scale_y_continuous(limits=c(-1, 4)) +
+                          direction="both", nudge_y =1.5, nudge_x= c(2.5,0) )+    #bouger verticalement
+
+
+          scale_x_discrete(limits=names(thr_si[order(-thr_si)]))+
+          scale_y_continuous(limits=c(-5, 5)) +
           labs(shape = "siRNA", color = "Samples", #Renommenr les labels, titres et axes
                title="Nanostring Screen Epigenetic \n TS/PS in IMR90",
                y="Log2 Fold Change (Median) ",
@@ -700,7 +849,8 @@ ggplot( data = exprsi,
 
 
 
-------------------------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------
 #ADAM12 kinases
@@ -715,13 +865,16 @@ ggplot(data = exprk,
            y = vec, color = type)) +
           scale_color_manual(values=c("orange", "black")) +
   
-          geom_jitter(data = subset(exprk, type %in% c( "Kinases") & gene == "ADAM12"),
+          geom_jitter(data = subset(exprk, type %in% c( "Kinases") & gene == "ADAM12" & ech != "MAP3K7"),
                       aes(x= factor(""), 
                           y = vec , color = type), position=position_jitter(0.3), size = 3) +
   
           geom_jitter(data = subset(exprk, type %in% c("Untransfected") & gene == "ADAM12"), 
                       aes(x= factor(""), y = vec , color = type), 
                       position=position_jitter(0.2), size = 3) +
+  
+  geom_hline(yintercept = thr_A12, color = "black", linetype = "dashed")+
+  geom_hline(yintercept = thr_A12_plus, color = "black", size= 2)+
   
           labs(colour="") +  
   
@@ -755,11 +908,14 @@ iks = subset(exprsi, ech %in% c("KAT2A", "SIRT6") & gene == "ADAM12")
 
 ggplot(data = exprsi) +
   
-          geom_jitter(data = subset(exprsi, type %in% c("siRNA") & gene == "ADAM12"), # extract ADAM12
+          geom_jitter(data = subset(exprsi, type %in% c("siRNA") & gene == "ADAM12" & !(ech  %in% c("KAT2A", "SIRT6"))), # extract ADAM12
                       aes(x= factor(""), y = vec , color = type), position=position_jitter(0.3), size=3) +
   
           geom_jitter(data = subset(exprsi, type %in% c("siCtrl") & gene == "ADAM12"), # extract ADAM12
                       aes(x= factor(""), y = vec , color = type) , position=position_jitter(0.1), size=3) +
+    
+  geom_hline(yintercept = thr_A12_si, color = "black", linetype = "dashed")+
+  geom_hline(yintercept = thr_A12_si_plus, color = "black", size= 2)+
           scale_color_manual(values=c("black", "orange")) +
   
           labs(colour="") +  
