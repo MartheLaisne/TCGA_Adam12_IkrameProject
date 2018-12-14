@@ -1,0 +1,425 @@
+---
+title: "Figure Papier Adam12: Control RNA"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '4'
+  html_notebook:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
+
+#Intro
+
+##Path
+```{r}
+pathData = "C:/Users/marth/Desktop/These_Marthe/1_Bioinfo/181113_Oli_figures-for-paper"
+
+```
+
+## Data
+```{r}
+load("C:/Users/marth/Desktop/These_Marthe/1_Bioinfo/181113_Oli_figures-for-paper/controlRNA.RData")
+
+```
+
+##Librairies
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(forcats)
+
+library(psych)
+```
+
+##Fonctions
+
+```{r}
+
+vecto = function(data) {
+                 vec = NULL ; ech = NULL ; gene = NULL ; expr = NULL
+                 for (i in 1:ncol(data)) {
+                           vec = c(vec, data[,i])
+                           ech = c(ech, rep( colnames(data)[i], length(data[,i])) )
+                           gene = rep(row.names(data), ncol(data))
+                 }
+
+                 dt = data.frame(vec, ech, gene)
+                 
+                 dt$ech = factor(dt$ech, levels = colnames(data))
+                 
+                 dt$gene = factor(dt$gene, levels = rownames(data))
+
+         return( dt )
+}
+
+
+Ma_function_mean = function(X) {
+  mean(X, na.rm=T)
+}
+
+
+Ma_function_sd = function(X) {
+  sd(X, na.rm=T)
+}
+
+```
+
+#Explorations données
+
+```{r}
+tab %>% head
+raw = data.frame(tab[genes$rank.initial,-c(2:5)]) # reordering of the table to fit with indexes
+rownames(raw) = raw[,1]
+raw %>% head
+raw = data.frame(raw[,-1])
+raw %>% head
+
+label = tab[genes$rank.initial,c(1:5)]
+label %>% head
+
+annot 
+annot %>% dim
+raw %>% dim
+```
+
+
+```{r}
+# Probes indexes
+cta<-c(1:42)      # Cancer Testis Antigens
+goi<-c(43:54)     # Genes of interest
+imp<-c(55:56)     # Imprinted genes
+rpt<-c(57:79)     # Repeated elements
+hsk<-c(83:86)     # House keeping genes (4)
+hskptt<-c(84:86)  # HSK -B2M
+hsktt<-c(85:86)   # HSK -B2M &PGK1
+hskbpt<-c(83:85)  # HSK -TUB2A
+pos<-c(95:100)    # Nanostring spike-in positive controls
+neg<-c(87:94)     # Nanostring negative controls
+myr= 80           # myr-tag probe (in fusion with activated kinases)
+neo=81            # Neomycin resistance probe (kinase screen)
+puro=82  
+```
+
+```{r}
+raw[ hsk,] %>% head
+```
+
+
+##Normalisation basique par moyenne geometrique des trois norm
+```{r}
+Norm_raw = raw
+
+for (i in seq_along(colnames(raw))) {
+  Norm_raw[,i] = raw[,i]/ geometric.mean(raw[hskbpt,i])
+}
+
+ 
+Norm_raw[hsk, ] %>% head
+```
+
+
+##Moyenne
+```{r}
+moy_norm = data.frame(cbind(t(Norm_raw[cta,]),
+                            annot))
+
+moy_norm2 = NULL
+for (i in cta) {
+  moy_norm2 = cbind(moy_norm2,
+                    by(as.numeric(moy_norm[,i]), moy_norm[,"ech"], Ma_function_mean))
+  colnames(moy_norm2)[i] = colnames(moy_norm)[i]
+}
+
+moy_norm2
+```
+
+
+##FC
+```{r}
+moy_norm3 = moy_norm2
+for (i in cta) {
+  moy_norm3[,i] = moy_norm2 [,i]/c(moy_norm2[1,i])
+}
+
+moy_norm3
+```
+
+
+```{r}
+vaw = vecto(moy_norm3[c(1,2,3,4),]) 
+vaw %>% head
+```
+
+###THR
+```{r}
+id_ech = which(is.element(annot$ech, c("ech", "ctneg"))==TRUE)
+
+mean_k = apply(log2(Norm_raw[cta,id_ech]), 1, Ma_function_mean )
+
+sd_FC_k = apply(log2(Norm_raw[cta,id_ech]), 1, Ma_function_sd )
+
+#for (i in seq_along(colnames(raw))) {
+#  Norm_raw[,i] = raw[,i]/ geometric.mean(raw[hskbpt,i])
+#}
+
+
+#Sans la loi normale, on prend juste un thr à 2.5 SD de la moyenne
+thr_generic_2_5 = log2((2^(mean_k + 2.5 * sd_FC_k))/c(moy_norm2[1,cta]))
+thr_generic_2_5
+```
+
+Pas possible les THR sont trop haut, les faibles comptes sont trop variables sans normalisation. On laisse romber les FC
+
+##Plot
+```{r}
+ord = subset(vaw, gene == "curie")
+
+Bar_err_k = rep(thr_generic_2_5, each = 4)
+
+
+ggplot(data = 
+         #vaw,
+         subset(vaw, gene != "ech"),
+       aes(x = ech , y = log2(vec), color = factor(gene, labels = c("IMR90", "SW39", "Testis"))))+
+  geom_point(size=3, shape=19)+
+  scale_color_manual(values = c("black", "green4", "red4", "orange", "black"))+
+  geom_hline(aes(yintercept=0), color="black", linetype="solid", size=0.5)+
+ # geom_errorbar(aes(ymin= 0, ymax=Bar_err_k, color = "Threshold Z = 2.5"), width=1, size=1) +
+  scale_x_discrete(limits=ord[order(-ord$vec),]$ech)+
+  labs(color = "Samples", #Renommenr les labels, titres et axes
+               title="Nanostring Screen Kinases \n TS/PS in IMR90",
+               y="Log2 Fold Change",
+               x="TS/PS targeted")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 12, face = "bold",hjust = 0.5),         #Mise en page
+              text=element_text(),
+              axis.title = element_text(face="bold", size=10),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 6),
+              axis.text.y=element_text(colour="black", size = 6),
+        legend.text = element_text(size=8),
+        legend.position="right")
+
+```
+
+
+
+```{r}
+ggplot(data = 
+         vaw,
+         #subset(vaw, gene != "ech"),
+       aes(x = ech , y = vec, color = factor(gene, labels = c("IMR90", "SW39", "Testis", "Kinases"))))+
+  geom_point(size=3, shape=19)+
+  scale_color_manual(values = c("black", "green4", "red4", "orange", "black"))+
+  geom_hline(aes(yintercept=0), color="black", linetype="solid", size=0.5)+
+ # geom_errorbar(aes(ymin= 0, ymax=Bar_err_k, color = "Threshold Z = 2.5"), width=1, size=1) +
+  scale_x_discrete(limits=ord[order(-ord$vec),]$ech)+
+  labs(color = "Samples", #Renommenr les labels, titres et axes
+               title="Nanostring Screen Kinases \n TS/PS in IMR90",
+               y="Log2 Fold Change",
+               x="TS/PS targeted")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 12, face = "bold",hjust = 0.5),         #Mise en page
+              text=element_text(),
+              axis.title = element_text(face="bold", size=10),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 6),
+              axis.text.y=element_text(colour="black", size = 6),
+        legend.text = element_text(size=8),
+        legend.position="right")
+```
+
+#Ctl siRNA
+
+On prend la normalisation utilisée par Olivier pour générer le graphe barplot
+on sélectionne uniquement les probes et les échantillons qui nous intéresse (siCtl)
+
+```{r}
+ctnegsin <-  grep("Ctrl.neg", colnames(allNphsi))        # Negative controls on norm data
+
+allNphbptsia  [which(is.element(rownames(allNphbptsia),
+                             c("DNMT1", "Tet2", "Tet3", 
+                               "PPM1D", "UHRF1", "ZBTB33", "ZBTB38", "ZBTB4"))), c(9:21, 134, 161)]
+```
+
+#miniFC
+On calcule la médiane d'expression dans les IMR non infectées, et on calcule le FC par rapport à cette médiane
+```{r}
+data = allNphbptsia  [which(is.element(rownames(allNphbptsia),
+                             c("DNMT1", "Tet2", "Tet3", 
+                               "PPM1D", "UHRF1", "ZBTB33", "ZBTB38", "ZBTB4"))), c(9:21, 134, 161)]
+moy_data = c(median(as.numeric(data[1,-c(1:4)])),
+             median(as.numeric(data[2,-11])),
+             median(as.numeric(data[3,-5])),
+             median(as.numeric(data[4,-6])),
+             median(as.numeric(data[5,-10])),
+             median(as.numeric(data[6,-7])),
+             median(as.numeric(data[7,-8])),
+             median(as.numeric(data[8,-9])))
+
+moy_data = c(median(as.numeric(data[1,1:4])),
+             median(as.numeric(data[2,1:4])),
+             median(as.numeric(data[3,1:4])),
+             median(as.numeric(data[4,1:4])),
+             median(as.numeric(data[5,1:4])),
+             median(as.numeric(data[6,1:4])),
+             median(as.numeric(data[7,1:4])),
+             median(as.numeric(data[8,1:4])))
+
+data2 = data
+for (i in seq_along(moy_data)) {
+  data2[i,] = data[i,]/moy_data[i]
+}
+```
+
+```{r}
+data_si = vecto(t(data2))
+head(data_si)
+```
+
+#On labélise les échantillons. C'est un peu pénible, y aller prudamment
+
+```{r}
+facto_si = c( c(rep("IMR90", 4), rep("siRNA", 4), rep("siCtl", 7)),
+              c(rep("IMR90", 4),rep("siCtl",10),"siRNA"),
+              c(rep("IMR90", 4),rep("siCtl", 4), "siRNA", rep("siCtl", 6)),
+              c(rep("IMR90", 4),rep("siCtl", 5), "siRNA", rep("siCtl", 5)),
+              c(rep("IMR90", 4),rep("siCtl", 9), "siRNA", "siCtl"),
+              c(rep("IMR90", 4),rep("siCtl", 6), "siRNA", rep("siCtl", 4)),
+              c(rep("IMR90", 4),rep("siCtl", 7), "siRNA", rep("siCtl", 3)),
+              c(rep("IMR90", 4),rep("siCtl", 8), "siRNA", rep("siCtl", 2)))
+
+data_si = cbind(data_si, facto_si)
+head(data_si)
+
+data_si$ech[which(is.element(data_si$ech, c("DNMT1..2", "DNMT1..3", "DNMT1..4"))==TRUE)] = "DNMT1"
+```
+
+#PLot
+```{r}
+
+ggplot(data = subset(data_si, 
+                     #facto_si !="siCtl" & 
+                     !(ech %in% c("Tet3", "Tet2")) ),
+       aes(x = ech , y = log2(vec), color = facto_si))+
+  geom_jitter(size=3, shape=19, width = 0.1)+
+  scale_color_manual(values = c("black", "green4", "orange", "black"))+
+  geom_hline(aes(yintercept=0), color="black", linetype="solid", size=0.5)+
+ # geom_errorbar(aes(ymin= 0, ymax=Bar_err_k, color = "Threshold Z = 2.5"), width=1, size=1) +
+ # scale_x_discrete(limits=ord[order(-ord$vec),]$ech)+
+  labs(color = "Samples", #Renommenr les labels, titres et axes
+               title="siRNA Efficiency control",
+               y="Log2 Fold Change",
+               x="TS/PS targeted")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 12, face = "bold",hjust = 0.5),         #Mise en page
+              text=element_text(),
+              axis.title = element_text(face="bold", size=10),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 6),
+              axis.text.y=element_text(colour="black", size = 6),
+        legend.text = element_text(size=8),
+        legend.position="right")
+```
+
+
+
+```{r}
+ggplot(data = subset(data_si, 
+                     #facto_si !="siCtl" & 
+                     !(ech %in% c("Tet3", "Tet2")) ),
+       aes(x = gene , y = log2(vec), fill = facto_si))+
+  geom_bar(stat="identity", color="black", position=position_dodge())+
+facet_wrap( ~ ech, ncol=3)+
+  scale_fill_manual(values = c("black", "green4", "orange", "black"))+
+  geom_hline(aes(yintercept=0), color="black", linetype="solid", size=0.5)+
+ # geom_errorbar(aes(ymin= 0, ymax=Bar_err_k, color = "Threshold Z = 2.5"), width=1, size=1) +
+ # scale_x_discrete(limits=ord[order(-ord$vec),]$ech)+
+  labs(color = "Samples", #Renommenr les labels, titres et axes
+               title="siRNA Efficiency control",
+               y="Log2 Fold Change",
+               x="TS/PS targeted")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 12, face = "bold",hjust = 0.5),         #Mise en page
+              text=element_text(),
+              axis.title = element_text(face="bold", size=10),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 6),
+              axis.text.y=element_text(colour="black", size = 6),
+        legend.text = element_text(size=8),
+        legend.position="right")
+```
+##Barplot avec tous
+```{r}
+ggplot(data = data_si,
+       aes(x = gene , y = log2(vec), fill = facto_si))+
+  geom_bar(stat="identity", color="black", position=position_dodge())+
+facet_wrap( ~ ech, ncol=8)+
+  scale_fill_manual(values = c("black", "green4", "orange", "black"))+
+  geom_hline(aes(yintercept=0), color="black", linetype="solid", size=0.5)+
+ # geom_errorbar(aes(ymin= 0, ymax=Bar_err_k, color = "Threshold Z = 2.5"), width=1, size=1) +
+ # scale_x_discrete(limits=ord[order(-ord$vec),]$ech)+
+  labs(color = "Samples", #Renommenr les labels, titres et axes
+               title="siRNA Efficiency control",
+               y="Log2 Fold Change",
+               x="TS/PS targeted")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 12, face = "bold",hjust = 0.5),         #Mise en page
+              text=element_text(),
+              axis.title = element_text(face="bold", size=10),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 6),
+              axis.text.y=element_text(colour="black", size = 6),
+        legend.text = element_text(size=8),
+        legend.position="right")
+```
+
+
+
+#Ctl Myr-Flag
+```{r}
+
+which(vkr$ech =="MAP3K7")
+echtype = c(rep("IMR90", 3), 
+            rep("SW39",2), 
+            rep("Kinases",27),
+            "TAK1",
+            rep("Kinases",163)
+)
+
+vknm = data.frame(vecto(allNphpttk[myr,]), Samples = echtype)
+
+
+mn = ggplot(vknm, aes(ech, vec, color = Samples)) +
+  geom_point(size = 3) +
+  scale_y_continuous(trans='log2') +
+  labs(color = "Samples", #Renommenr les labels, titres et axes
+               title="Kinase expression control",
+               y="Myr-Flag counts (log2)",
+               x="Samples")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 12, face = "bold",hjust = 0.5),         #Mise en page
+              text=element_text(),
+              axis.title = element_text(face="bold", size=10),
+              axis.text.x=element_text(angle=45, hjust=1,colour="black", size = 6),
+              axis.text.y=element_text(colour="black", size = 6),
+        legend.text = element_text(size=8),
+        legend.position="right")+
+  scale_color_manual(breaks = c("IMR90", "Kinases", "SW39", "TAK1"),
+                        values=c("black", "orange", "green4", "orange"))
+
+
+mn
+
+```
+
+
+
+
+
+
